@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: edusphere-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: node dist/server.js
+    plan: starter
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: DEEPFACE_API_KEY
+        sync: false
+      - key: DEEPFACE_API_URL
+        fromService:
+          name: edusphere-deepface
+          type: web
+          property: host
+      - key: FRONTEND_URL
+        value: https://eduspheredetection.netlify.app
+
+  - type: web
+    name: edusphere-deepface
+    runtime: docker
+    rootDir: deepface-service
+    dockerfilePath: ./Dockerfile
+    plan: standard
+    healthCheckPath: /health
+    envVars:
+      - key: DEEPFACE_API_KEY
+        sync: false
