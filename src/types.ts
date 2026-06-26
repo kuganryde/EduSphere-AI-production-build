@@ -1,3 +1,25 @@
+// ── Core Types for EduSphere AI ───────────────────────────────
+
+export interface Session {
+  id: string;
+  room_id: string;
+  lecturer_name: string;
+  course_code: string;
+  expected_capacity: number;
+  started_at: string;
+  ended_at: string | null;
+  status: 'active' | 'ended';
+}
+
+export interface Alert {
+  id: string;
+  level: 1 | 2 | 3;
+  message: string;
+  room_id: string;
+  timestamp: string;
+  dismissed: boolean;
+}
+
 export interface PedagogicalAnalysis {
   headcount: number;
   lecturer_present: boolean;
@@ -28,24 +50,33 @@ export interface DeepFaceResult {
     total_faces: number;
   };
   degraded?: boolean;
+  error?: string;
 }
 
-export interface Session {
+export interface Room {
   id: string;
-  room_id: string;
-  lecturer_name: string;
-  course_code: string;
+  name: string;
+  location: string;
   expected_capacity: number;
-  started_at: string;
-  ended_at: string | null;
-  status: 'active' | 'ended';
+  camera_url: string | null;
+  created_at: string;
 }
 
-export interface Alert {
+export interface EngagementSnapshot {
   id: string;
-  level: 1 | 2 | 3;
-  message: string;
+  session_id: string;
   room_id: string;
   timestamp: string;
-  dismissed: boolean;
+  engagement_score: number;
+  headcount: number;
+  lecturer_present: boolean;
+  classroom_sentiment: string;
+  attention_rate: number | null;
+  dominant_emotion: string;
+  gestures: PedagogicalAnalysis['gestures'];
+  alert_level: number | null;
 }
+
+export type SentimentType = 'focused' | 'distracted' | 'tired' | 'energetic' | 'mixed';
+export type AlertLevel = 1 | 2 | 3;
+export type ClassState = 'IDLE' | 'ACTIVE' | 'ALERT';
