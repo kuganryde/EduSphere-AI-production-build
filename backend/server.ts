@@ -15,6 +15,7 @@ import sessionsRoutes from "./routes/sessions";
 import cameraRoutes from "./routes/camera";
 import streamRoutes from "./routes/stream";
 import diagnosticRoutes from "./routes/diagnostic";
+import alertsRoutes from "./routes/alerts";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -48,6 +49,7 @@ app.use("/api/analytics",         analyticsRoutes);
 app.use("/api/sessions",          sessionsRoutes);
 app.use("/api/camera",            cameraRoutes);
 app.use("/api/stream",            streamRoutes);
+app.use("/api/alerts",            alertsRoutes);
 app.use("/api/diagnostic",        diagnosticRoutes);
 
 // ── 404 Handler ───────────────────────────────────────────────

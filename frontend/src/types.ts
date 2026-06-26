@@ -37,6 +37,25 @@ export interface PedagogicalAnalysis {
   source_id: string;
 }
 
+export interface BoundingBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface DetectedFace {
+  box: BoundingBox;
+  emotion: string;
+  attention: boolean;
+  confidence: number;
+}
+
+export interface DetectedPerson {
+  box: BoundingBox;
+  confidence: number;
+}
+
 export interface DeepFaceResult {
   face_count: number;
   emotions: string[];
@@ -47,8 +66,24 @@ export interface DeepFaceResult {
     emotion_breakdown: Record<string, number>;
     total_faces: number;
   };
+  // Bounding box data
+  faces: DetectedFace[];
+  persons: DetectedPerson[];
+  frame_width: number;
+  frame_height: number;
   degraded?: boolean;
   error?: string;
+}
+
+export interface AlertRecord {
+  id: string;
+  session_id: string | null;
+  room_id: string;
+  level: 1 | 2 | 3;
+  message: string;
+  alert_type: string;
+  created_at: string;
+  dismissed_at: string | null;
 }
 
 export interface Room {

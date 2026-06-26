@@ -2,6 +2,7 @@ import { Router } from "express";
 import { GoogleGenAI } from "@google/genai";
 import rateLimit from "express-rate-limit";
 import { supabase } from "../supabase_service";
+import { broadcastToRoom } from "./stream";
 
 const router = Router();
 
@@ -11,7 +12,6 @@ const limiter = rateLimit({
   message: { error: "Rate limit exceeded" },
 });
 
-// Short cache per room — 30s so live monitoring still gets fresh data
 const cache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_DURATION = 30 * 1000;
 
@@ -19,6 +19,12 @@ const ALERT_LEVEL: Record<string, number> = {
   high_distraction: 2,
   low_attendance: 2,
   lecturer_absent: 3,
+};
+
+const ALERT_MESSAGE: Record<string, string> = {
+  high_distraction: "High distraction detected — class may need re-engagement",
+  low_attendance: "Low attendance — headcount below expected capacity",
+  lecturer_absent: "Lecturer not visible — supervision gap detected",
 };
 
 router.post("/", limiter, async (req, res) => {
@@ -94,7 +100,7 @@ router.post("/", limiter, async (req, res) => {
       cache.set(effectiveRoomId, { data: resultData, timestamp: Date.now() });
     }
 
-    // Persist snapshot to Supabase (fire-and-forget, don't block response)
+    // Persist engagement snapshot
     if (session_id && effectiveRoomId) {
       supabase
         .from("engagement_snapshots")
@@ -111,6 +117,33 @@ router.post("/", limiter, async (req, res) => {
         })
         .then(({ error }) => {
           if (error) console.error("Snapshot save error:", error.message);
+        });
+    }
+
+    // Persist alert to alerts table + broadcast via SSE
+    if (resultData.alert && effectiveRoomId) {
+      const alertPayload = {
+        session_id: session_id ?? null,
+        room_id: effectiveRoomId,
+        level: ALERT_LEVEL[resultData.alert] ?? 1,
+        message: ALERT_MESSAGE[resultData.alert] ?? resultData.alert,
+        alert_type: resultData.alert,
+      };
+
+      supabase
+        .from("alerts")
+        .insert(alertPayload)
+        .select()
+        .single()
+        .then(({ data: alertRow, error }) => {
+          if (error) {
+            console.error("Alert save error:", error.message);
+            return;
+          }
+          // Broadcast to any SSE clients watching this room
+          if (alertRow) {
+            broadcastToRoom(effectiveRoomId, "alert", alertRow);
+          }
         });
     }
 

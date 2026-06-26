@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import RoomCard from './RoomCard';
 import AlertBanner from './AlertBanner';
+import AlertLog from './AlertLog';
 import EngagementChart from './EngagementChart';
 import GestureBreakdown from './GestureBreakdown';
 import SessionPanel from './SessionPanel';
@@ -168,8 +169,11 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
           <div className="md:col-span-1 lg:col-span-1 xl:col-span-4 w-full">
             <EngagementChart data={engagementHistory} sessionDuration={sessionDuration} />
           </div>
-          <div className="md:col-span-2 lg:col-span-1 xl:col-span-4 w-full">
+          <div className="md:col-span-1 lg:col-span-1 xl:col-span-4 w-full">
             <GestureBreakdown gestures={lastGestures} />
+          </div>
+          <div className="md:col-span-1 lg:col-span-1 xl:col-span-4 w-full">
+            <AlertLog roomId={ROOM_ID} sessionId={currentSession?.id} />
           </div>
         </div>
       </div>
