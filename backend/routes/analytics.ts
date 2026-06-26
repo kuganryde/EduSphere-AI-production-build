@@ -1,60 +1,133 @@
 import { Router } from "express";
+import { supabase } from "../supabase_service";
 
 const router = Router();
 
-router.get("/rooms/summary", (req, res) => {
-  res.json([
-    {
-      roomId: "room-402-b",
-      name: "Room 402-B / Main Stage",
-      status: "active",
-      engagement: 84,
-      headcount: 32,
-      capacity: 34,
-      lastUpdate: new Date().toISOString()
-    },
-    {
-      roomId: "lecture-hall-a",
-      name: "Lecture Hall A / Secondary",
-      status: "idle",
-      engagement: 0,
-      headcount: 0,
-      capacity: 100,
-      lastUpdate: new Date().toISOString()
-    }
-  ]);
+// GET /api/analytics/rooms/summary — current status of all rooms
+router.get("/rooms/summary", async (req, res) => {
+  const { data: rooms, error: roomsError } = await supabase
+    .from("rooms")
+    .select("id, name, expected_capacity");
+
+  if (roomsError) {
+    res.status(500).json({ error: roomsError.message });
+    return;
+  }
+
+  // For each room, get its latest snapshot and active session
+  const summaries = await Promise.all(
+    (rooms ?? []).map(async (room) => {
+      const [{ data: snapshot }, { data: session }] = await Promise.all([
+        supabase
+          .from("engagement_snapshots")
+          .select("engagement_score, headcount, classroom_sentiment, timestamp")
+          .eq("room_id", room.id)
+          .order("timestamp", { ascending: false })
+          .limit(1)
+          .single(),
+        supabase
+          .from("sessions")
+          .select("id, status")
+          .eq("room_id", room.id)
+          .eq("status", "active")
+          .limit(1)
+          .single(),
+      ]);
+
+      return {
+        roomId: room.id,
+        name: room.name,
+        status: session ? "active" : "idle",
+        engagement: snapshot?.engagement_score ?? 0,
+        headcount: snapshot?.headcount ?? 0,
+        capacity: room.expected_capacity,
+        lastUpdate: snapshot?.timestamp ?? null,
+      };
+    })
+  );
+
+  res.json(summaries);
 });
 
-router.get("/trends", (req, res) => {
-  res.json({
-    trend: "stable",
-    days: [
-      { date: "2023-10-20", averageEngagement: 78 },
-      { date: "2023-10-21", averageEngagement: 82 },
-      { date: "2023-10-22", averageEngagement: 80 },
-      { date: "2023-10-23", averageEngagement: 85 },
-      { date: "2023-10-24", averageEngagement: 88 },
-      { date: "2023-10-25", averageEngagement: 84 },
-      { date: "2023-10-26", averageEngagement: 86 }
-    ]
-  });
+// GET /api/analytics/trends — engagement trends last 7 days
+router.get("/trends", async (req, res) => {
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data, error } = await supabase
+    .from("engagement_snapshots")
+    .select("timestamp, engagement_score")
+    .gte("timestamp", since)
+    .order("timestamp", { ascending: true });
+
+  if (error) {
+    res.status(500).json({ error: error.message });
+    return;
+  }
+
+  // Group by day and average
+  const byDay: Record<string, number[]> = {};
+  for (const row of data ?? []) {
+    const day = row.timestamp.slice(0, 10);
+    if (!byDay[day]) byDay[day] = [];
+    byDay[day].push(row.engagement_score);
+  }
+
+  const days = Object.entries(byDay).map(([date, scores]) => ({
+    date,
+    averageEngagement: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
+  }));
+
+  res.json({ trend: days.length > 1 ? "available" : "insufficient_data", days });
 });
 
-router.get("/:sessionId", (req, res) => {
+// GET /api/analytics/:sessionId — full analytics for a session
+router.get("/:sessionId", async (req, res) => {
   const { sessionId } = req.params;
+
+  const [{ data: session, error: sessionError }, { data: snapshots, error: snapshotsError }] =
+    await Promise.all([
+      supabase.from("sessions").select("*").eq("id", sessionId).single(),
+      supabase
+        .from("engagement_snapshots")
+        .select("*")
+        .eq("session_id", sessionId)
+        .order("timestamp", { ascending: true }),
+    ]);
+
+  if (sessionError) {
+    res.status(sessionError.code === "PGRST116" ? 404 : 500).json({ error: sessionError.message });
+    return;
+  }
+
+  if (snapshotsError) {
+    res.status(500).json({ error: snapshotsError.message });
+    return;
+  }
+
+  const scores = (snapshots ?? []).map((s) => s.engagement_score).filter(Boolean);
+  const avg = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+  const peak = scores.length ? Math.max(...scores) : 0;
+  const lowest = scores.length ? Math.min(...scores) : 0;
+
+  const sentiments = (snapshots ?? []).map((s) => s.classroom_sentiment).filter(Boolean);
+  const sentimentCounts: Record<string, number> = {};
+  for (const s of sentiments) sentimentCounts[s] = (sentimentCounts[s] ?? 0) + 1;
+
+  const startedAt = session.started_at ? new Date(session.started_at) : new Date();
+  const endedAt = session.ended_at ? new Date(session.ended_at) : new Date();
+  const durationMinutes = Math.round((endedAt.getTime() - startedAt.getTime()) / 60000);
+
   res.json({
     sessionId,
-    startTime: new Date(Date.now() - 45 * 60000).toISOString(),
-    durationMinutes: 45,
-    averageEngagement: 84,
-    peakEngagement: 92,
-    lowestEngagement: 65,
-    totalAlerts: 2,
-    emotionDistribution: {
-      focused: 65,
-      mixed: 25,
-      distracted: 10
-    }
+    session,
+    startTime: session.started_at,
+    durationMinutes,
+    averageEngagement: avg,
+    peakEngagement: peak,
+    lowestEngagement: lowest,
+    totalSnapshots: snapshots?.length ?? 0,
+    emotionDistribution: sentimentCounts,
+    snapshots,
   });
 });
 

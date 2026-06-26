@@ -10,22 +10,23 @@ const limiter = rateLimit({
 });
 
 router.post("/", limiter, async (req, res) => {
-  const { frame } = req.body;
-  const deepfaceUrl = process.env.DEEPFACE_URL || "http://localhost:5000/analyze";
-  const apiKey = process.env.DEEPFACE_API_KEY || "default_key";
+  const { image_b64, session_id, room_id } = req.body;
+
+  const deepfaceUrl = process.env.DEEPFACE_API_URL || "http://localhost:8000";
+  const apiKey = process.env.DEEPFACE_API_KEY || "";
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 sec timeout
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-    const response = await fetch(deepfaceUrl, {
+    const response = await fetch(`${deepfaceUrl}/analyze`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-API-Key": apiKey
+        "x-api-key": apiKey,
       },
-      body: JSON.stringify({ frame }),
-      signal: controller.signal
+      body: JSON.stringify({ image_b64, session_id, room_id }),
+      signal: controller.signal,
     });
 
     clearTimeout(timeoutId);
@@ -38,7 +39,6 @@ router.post("/", limiter, async (req, res) => {
     res.json(data);
   } catch (error) {
     console.error("DeepFace Error:", error);
-    // Graceful degradation
     res.json({ degraded: true, message: "DeepFace service unavailable" });
   }
 });

@@ -1,68 +1,91 @@
 import { Router } from "express";
+import { supabase } from "../supabase_service";
 
 const router = Router();
 
-// Mock database
-const sessions: any[] = [];
+router.post("/", async (req, res) => {
+  const { room_id, lecturer_name, course_code, expected_capacity } = req.body;
 
-router.post("/", (req, res) => {
-  const { roomId, lecturerName, courseCode, capacity } = req.body;
-  const newSession = {
-    id: `session-${Date.now()}`,
-    roomId,
-    lecturerName,
-    courseCode,
-    capacity,
-    startTime: new Date().toISOString(),
-    status: "active"
-  };
-  sessions.push(newSession);
-  res.status(201).json(newSession);
-});
-
-router.patch("/:id/end", (req, res) => {
-  const { id } = req.params;
-  const session = sessions.find(s => s.id === id);
-  
-  if (!session) {
-    res.status(404).json({ error: "Session not found" });
+  if (!lecturer_name || !course_code) {
+    res.status(400).json({ error: "lecturer_name and course_code are required" });
     return;
   }
-  
-  session.status = "ended";
-  session.endTime = new Date().toISOString();
-  
-  res.json(session);
+
+  const { data, error } = await supabase
+    .from("sessions")
+    .insert({ room_id, lecturer_name, course_code, expected_capacity, status: "active" })
+    .select()
+    .single();
+
+  if (error) {
+    res.status(500).json({ error: error.message });
+    return;
+  }
+
+  res.status(201).json(data);
 });
 
-router.get("/", (req, res) => {
+router.patch("/:id/end", async (req, res) => {
+  const { id } = req.params;
+
+  const { data, error } = await supabase
+    .from("sessions")
+    .update({ status: "ended", ended_at: new Date().toISOString() })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) {
+    res.status(error.code === "PGRST116" ? 404 : 500).json({ error: error.message });
+    return;
+  }
+
+  res.json(data);
+});
+
+router.get("/", async (req, res) => {
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;
-  
-  const startIndex = (page - 1) * limit;
-  const endIndex = page * limit;
-  
+  const from = (page - 1) * limit;
+  const to = from + limit - 1;
+
+  const { data, error, count } = await supabase
+    .from("sessions")
+    .select("*", { count: "exact" })
+    .order("started_at", { ascending: false })
+    .range(from, to);
+
+  if (error) {
+    res.status(500).json({ error: error.message });
+    return;
+  }
+
   res.json({
-    data: sessions.slice(startIndex, endIndex),
+    data,
     pagination: {
       page,
       limit,
-      total: sessions.length,
-      totalPages: Math.ceil(sessions.length / limit)
-    }
+      total: count ?? 0,
+      totalPages: Math.ceil((count ?? 0) / limit),
+    },
   });
 });
 
-router.get("/:id", (req, res) => {
+router.get("/:id", async (req, res) => {
   const { id } = req.params;
-  const session = sessions.find(s => s.id === id);
-  
-  if (!session) {
-    res.status(404).json({ error: "Session not found" });
+
+  const { data, error } = await supabase
+    .from("sessions")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    res.status(error.code === "PGRST116" ? 404 : 500).json({ error: error.message });
     return;
   }
-  
-  res.json(session);
+
+  res.json(data);
 });
 
 export default router;
