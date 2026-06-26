@@ -1,30 +1,82 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import RoomCard from './RoomCard';
 import AlertBanner from './AlertBanner';
 import EngagementChart from './EngagementChart';
 import GestureBreakdown from './GestureBreakdown';
 import SessionPanel from './SessionPanel';
+import { Session, AnalysisUpdate, PedagogicalAnalysis } from '../types';
 
-interface LiveStats {
-  engagement: number;
-  headcount: number;
-  sentiment: string;
-  lecturerPresent: boolean;
+const ROOM_ID = 'room-402-b';
+const ROOM_NAME = 'Room 402-B / Main Stage';
+const ROOM_CAPACITY = 34;
+const MAX_HISTORY = 50;
+
+interface BannerAlert { id: string; message: string; level: 1 | 2 | 3 }
+
+const ALERT_MESSAGES: Record<string, string> = {
+  high_distraction: 'High distraction detected — class may need re-engagement',
+  low_attendance: 'Low attendance — headcount below expected capacity',
+  lecturer_absent: 'Lecturer not visible — supervision gap detected',
+};
+
+function formatElapsed(startedAt: string): string {
+  const diff = Date.now() - new Date(startedAt).getTime();
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  const s = Math.floor((diff % 60000) / 1000);
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-export default function Dashboard() {
-  const [stats, setStats] = useState<LiveStats>({
+interface DashboardProps {
+  onLiveStats?: (update: AnalysisUpdate) => void;
+}
+
+export default function Dashboard({ onLiveStats }: DashboardProps) {
+  const [currentSession, setCurrentSession] = useState<Session | null>(null);
+  const [stats, setStats] = useState<Omit<AnalysisUpdate, 'timestamp'>>({
     engagement: 0, headcount: 0, sentiment: 'Awaiting...', lecturerPresent: false,
+    gestures: null, alert: null, attentionRate: null,
   });
-  const [alerts, setAlerts] = useState([
-    { id: '1', message: 'Select a camera source to begin live monitoring', level: 1 as const },
+  const [engagementHistory, setEngagementHistory] = useState<{ time: string; focus: number; attention: number }[]>([]);
+  const [lastGestures, setLastGestures] = useState<PedagogicalAnalysis['gestures'] | null>(null);
+  const [bannerAlerts, setBannerAlerts] = useState<BannerAlert[]>([
+    { id: 'init', message: 'Select a camera source to begin live monitoring', level: 1 },
   ]);
 
-  const dismissAlert = (id: string) =>
-    setAlerts(a => a.filter(x => x.id !== id));
+  const dismissAlert = (id: string) => setBannerAlerts(a => a.filter(x => x.id !== id));
 
-  const engagementColor = stats.engagement > 79 ? 'text-green-400'
-    : stats.engagement > 49 ? 'text-amber-400' : 'text-red-400';
+  const handleStatsUpdate = useCallback((update: AnalysisUpdate) => {
+    setStats({ engagement: update.engagement, headcount: update.headcount, sentiment: update.sentiment, lecturerPresent: update.lecturerPresent, gestures: update.gestures, alert: update.alert, attentionRate: update.attentionRate });
+
+    if (update.gestures) setLastGestures(update.gestures);
+
+    const timeLabel = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    setEngagementHistory(prev => [
+      ...prev.slice(-(MAX_HISTORY - 1)),
+      { time: timeLabel, focus: update.engagement, attention: update.attentionRate ?? update.engagement },
+    ]);
+
+    // Remove init alert when first analysis arrives
+    setBannerAlerts(prev => prev.filter(a => a.id !== 'init'));
+
+    if (update.alert) {
+      setBannerAlerts(prev => {
+        const filtered = prev.filter(a => a.id !== 'analysis-alert');
+        return [...filtered, {
+          id: 'analysis-alert',
+          message: ALERT_MESSAGES[update.alert!] ?? update.alert!,
+          level: update.alert === 'lecturer_absent' ? 3 : 2,
+        }];
+      });
+    } else {
+      setBannerAlerts(prev => prev.filter(a => a.id !== 'analysis-alert'));
+    }
+
+    onLiveStats?.(update);
+  }, [onLiveStats]);
+
+  const engagementColor = stats.engagement > 79 ? 'text-green-400' : stats.engagement > 49 ? 'text-amber-400' : 'text-red-400';
+  const sessionDuration = currentSession ? formatElapsed(currentSession.started_at) : undefined;
 
   return (
     <div className="flex flex-col min-h-full bg-[#0b1120] w-full">
@@ -45,6 +97,9 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-4 xl:gap-6 text-xs font-medium text-white/90 uppercase tracking-wider">
+            <span>SESSION: <span className={`font-bold ${currentSession ? 'text-green-300' : 'text-white/50'}`}>
+              {currentSession ? currentSession.course_code : 'NONE'}
+            </span></span>
             <span>LECTURER: <span className={`font-bold ${stats.lecturerPresent ? 'text-green-300' : 'text-white'}`}>
               {stats.lecturerPresent ? 'PRESENT' : 'DETECTING...'}
             </span></span>
@@ -57,12 +112,10 @@ export default function Dashboard() {
       </div>
 
       <div className="px-4 md:px-6 pb-6 flex-1 flex flex-col w-full max-w-[1600px] mx-auto">
-        {/* Alerts */}
-        {alerts.map(a => (
+        {bannerAlerts.map(a => (
           <AlertBanner key={a.id} message={a.message} level={a.level} onDismiss={() => dismissAlert(a.id)} />
         ))}
 
-        {/* Header */}
         <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6 mb-6 mt-2">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-white mb-3">Lecture Hall Analysis</h1>
@@ -97,20 +150,26 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-12 gap-6 w-full">
           <div className="md:col-span-2 lg:col-span-3 xl:col-span-8 xl:row-span-3 w-full">
             <RoomCard
-              name="Room 402-B / Main Stage"
-              capacity={34}
-              roomId="room-402-b"
-              onStatsUpdate={setStats}
+              name={ROOM_NAME}
+              capacity={ROOM_CAPACITY}
+              roomId={ROOM_ID}
+              sessionId={currentSession?.id}
+              onStatsUpdate={handleStatsUpdate}
             />
           </div>
           <div className="md:col-span-1 lg:col-span-1 xl:col-span-4 w-full">
-            <SessionPanel />
+            <SessionPanel
+              currentSession={currentSession}
+              roomId={ROOM_ID}
+              onSessionStart={setCurrentSession}
+              onSessionEnd={() => setCurrentSession(null)}
+            />
           </div>
           <div className="md:col-span-1 lg:col-span-1 xl:col-span-4 w-full">
-            <EngagementChart />
+            <EngagementChart data={engagementHistory} sessionDuration={sessionDuration} />
           </div>
           <div className="md:col-span-2 lg:col-span-1 xl:col-span-4 w-full">
-            <GestureBreakdown />
+            <GestureBreakdown gestures={lastGestures} />
           </div>
         </div>
       </div>

@@ -1,54 +1,78 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { PedagogicalAnalysis } from '../types';
 
-export default function GestureBreakdown() {
-  const data = [
-    { name: 'Writing', value: 40, color: '#10b981' }, // green
-    { name: 'Hands Raised', value: 14, color: '#3b82f6' }, // blue
-    { name: 'Using Phone', value: 10, color: '#ef4444' }, // red
-    { name: 'Heads Down', value: 6, color: '#eab308' }, // yellow
-    { name: 'Board', value: 30, color: '#8b5cf6' }, // purple
-  ];
+interface GestureBreakdownProps {
+  gestures?: PedagogicalAnalysis['gestures'] | null;
+}
+
+const COLORS = {
+  writing_notes:   { color: '#10b981', label: 'Writing' },
+  looking_at_board:{ color: '#8b5cf6', label: 'Board' },
+  hands_raised:    { color: '#3b82f6', label: 'Hands Raised' },
+  using_phone:     { color: '#ef4444', label: 'Phone' },
+  heads_down:      { color: '#eab308', label: 'Heads Down' },
+};
+
+export default function GestureBreakdown({ gestures }: GestureBreakdownProps) {
+  const data = gestures
+    ? Object.entries(COLORS)
+        .map(([key, meta]) => ({
+          name: meta.label,
+          value: gestures[key as keyof typeof gestures] ?? 0,
+          color: meta.color,
+        }))
+        .filter(d => d.value > 0)
+    : [];
+
+  const hasData = data.length > 0;
 
   return (
     <div className="bg-[#121b2f] border border-white/5 p-5 md:p-6 rounded-2xl flex flex-col h-full min-h-[300px] shadow-sm w-full">
       <h3 className="text-base font-semibold text-white mb-2">Gesture Breakdown</h3>
-      <div className="flex-1 min-h-0 w-full relative">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie 
-              data={data} 
-              dataKey="value" 
-              nameKey="name" 
-              cx="50%" 
-              cy="50%" 
-              innerRadius={60}
-              outerRadius={90}
-              stroke="#121b2f"
-              strokeWidth={3}
-              paddingAngle={2}
-            >
-              {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.color} />
-              ))}
-            </Pie>
-            <Tooltip 
-              contentStyle={{ backgroundColor: '#0b1120', border: '1px solid #ffffff20', borderRadius: '8px', padding: '8px 12px' }}
-              itemStyle={{ color: '#fff', fontSize: '13px', fontWeight: 600 }}
-              formatter={(value: number) => [`${value}%`, '']}
-            />
-            <Legend 
-              verticalAlign="bottom" 
-              height={36}
-              iconType="circle"
-              iconSize={8}
-              wrapperStyle={{ fontSize: '11px', color: '#94a3b8' }}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-      <button className="w-full mt-4 py-3 bg-[#1e293b] hover:bg-[#334155] rounded-xl text-[11px] font-semibold tracking-wider uppercase border border-white/5 transition-colors text-white shrink-0 shadow-sm">
-        View Diagnostic Report
-      </button>
+
+      {!hasData ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-center gap-3">
+          <svg className="w-10 h-10 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11" />
+          </svg>
+          <p className="text-gray-600 text-xs font-mono uppercase tracking-widest">Gesture data appears after first AI analysis</p>
+        </div>
+      ) : (
+        <div className="flex-1 min-h-0 w-full relative">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={data}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                innerRadius={55}
+                outerRadius={85}
+                stroke="#121b2f"
+                strokeWidth={3}
+                paddingAngle={2}
+              >
+                {data.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip
+                contentStyle={{ backgroundColor: '#0b1120', border: '1px solid #ffffff20', borderRadius: '8px', padding: '8px 12px' }}
+                itemStyle={{ color: '#fff', fontSize: '13px', fontWeight: 600 }}
+                formatter={(value: number) => [`${value}`, '']}
+              />
+              <Legend
+                verticalAlign="bottom"
+                height={36}
+                iconType="circle"
+                iconSize={8}
+                wrapperStyle={{ fontSize: '11px', color: '#94a3b8' }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </div>
   );
 }

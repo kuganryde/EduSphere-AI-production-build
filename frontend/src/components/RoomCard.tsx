@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { AnalysisUpdate } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-const ANALYSIS_INTERVAL_MS = 15000; // analyse every 15 seconds
+const ANALYSIS_INTERVAL_MS = 15000;
 
 type SourceType = 'webcam' | 'youtube' | 'rtsp';
 interface Source { type: SourceType; url?: string }
@@ -24,7 +25,7 @@ interface RoomCardProps {
   capacity: number;
   roomId?: string;
   sessionId?: string;
-  onStatsUpdate?: (s: { engagement: number; headcount: number; sentiment: string; lecturerPresent: boolean }) => void;
+  onStatsUpdate?: (update: AnalysisUpdate) => void;
 }
 
 function getYouTubeId(url: string): string | null {
@@ -50,15 +51,11 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
   const streamRef = useRef<MediaStream | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ── Webcam ────────────────────────────────────────────────────
   const startWebcam = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
+      if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
       setSource({ type: 'webcam' });
       setShowModal(false);
     } catch (err: any) {
@@ -67,19 +64,12 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
   }, []);
 
   const stopSource = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
-    }
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
+    if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
+    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
     setSource(null);
     setLiveData(d => ({ ...d, analysing: false }));
   }, []);
 
-  // ── Frame capture ─────────────────────────────────────────────
   const captureFrame = useCallback((): string | null => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -92,7 +82,6 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
     return canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
   }, []);
 
-  // ── Analysis ──────────────────────────────────────────────────
   const runAnalysis = useCallback(async () => {
     const frame = captureFrame();
     if (!frame) return;
@@ -104,7 +93,7 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
       fetch(`${API_URL}/analyze/gemini`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: frame, roomId: id }),
+        body: JSON.stringify({ image: frame, room_id: id, session_id: sessionId ?? null }),
       }).then(r => r.json()),
       fetch(`${API_URL}/analyze/deepface`, {
         method: 'POST',
@@ -131,31 +120,33 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
     };
 
     setLiveData(updated);
+
     onStatsUpdate?.({
       engagement: updated.engagement,
       headcount: updated.headcount,
       sentiment: updated.sentiment,
       lecturerPresent: updated.lecturerPresent,
+      gestures: g?.gestures ?? null,
+      alert: g?.alert ?? null,
+      attentionRate: updated.attentionRate,
+      timestamp: new Date().toISOString(),
     });
   }, [captureFrame, id, sessionId, onStatsUpdate]);
 
-  // Start/stop analysis loop when source changes
   useEffect(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     if (source?.type === 'webcam') {
-      runAnalysis(); // immediate first run
+      runAnalysis();
       intervalRef.current = setInterval(runAnalysis, ANALYSIS_INTERVAL_MS);
     }
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [source, runAnalysis]);
 
-  // Cleanup on unmount
   useEffect(() => () => stopSource(), [stopSource]);
 
   const engColor = liveData.engagement > 79 ? 'text-green-500' : liveData.engagement > 49 ? 'text-amber-500' : 'text-red-500';
   const engBg   = liveData.engagement > 79 ? 'bg-green-500'   : liveData.engagement > 49 ? 'bg-amber-500'   : 'bg-red-500';
 
-  // ── Source modal ──────────────────────────────────────────────
   const handleUrlSubmit = () => {
     if (!urlInput.trim() || !pendingType) return;
     if (pendingType === 'youtube' && !getYouTubeId(urlInput)) {
@@ -170,10 +161,9 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
 
   return (
     <div className="flex flex-col gap-6 w-full h-full">
-      {/* ── Video panel ── */}
+      {/* Video panel */}
       <div className="w-full aspect-video sm:aspect-auto sm:h-[400px] xl:h-auto xl:flex-1 bg-black rounded-2xl border border-white/10 relative overflow-hidden flex flex-col shadow-lg">
 
-        {/* LIVE / ANALYSING badge */}
         <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
           <div className={`flex items-center gap-2 px-3 py-1 ${source ? 'bg-red-600/90' : 'bg-gray-700/80'} backdrop-blur-sm rounded-md text-[10px] font-bold text-white uppercase tracking-wider border ${source ? 'border-red-500' : 'border-white/10'}`}>
             <div className={`w-1.5 h-1.5 rounded-full ${source ? 'bg-white animate-pulse' : 'bg-gray-400'}`}></div>
@@ -186,21 +176,18 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
           )}
         </div>
 
-        {/* Last updated */}
         {liveData.lastUpdated && (
           <div className="absolute top-4 right-4 z-20 px-2 py-1 bg-black/60 backdrop-blur-sm rounded-md text-[9px] font-mono text-gray-400 border border-white/10">
             Last: {liveData.lastUpdated} · {liveData.latencyMs}ms
           </div>
         )}
 
-        {/* Error */}
         {liveData.error && (
           <div className="absolute top-12 left-4 right-4 z-20 px-3 py-2 bg-red-900/80 rounded-lg text-xs text-red-300 border border-red-500/30">
             ⚠ {liveData.error}
           </div>
         )}
 
-        {/* ── No source: placeholder ── */}
         {!source && (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-6 sm:p-8">
             <div className="w-16 h-16 sm:w-20 sm:h-20 bg-blue-900/20 rounded-full flex items-center justify-center mb-4 border border-blue-500/20">
@@ -226,12 +213,10 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
           </div>
         )}
 
-        {/* ── Webcam source ── */}
         {source?.type === 'webcam' && (
           <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
         )}
 
-        {/* ── YouTube source ── */}
         {source?.type === 'youtube' && source.url && (
           <div className="w-full h-full flex flex-col">
             <iframe
@@ -246,7 +231,6 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
           </div>
         )}
 
-        {/* ── RTSP source ── */}
         {source?.type === 'rtsp' && (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
             <div className="w-12 h-12 bg-green-900/20 rounded-full flex items-center justify-center mb-4 border border-green-500/20">
@@ -271,10 +255,8 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
           </div>
         )}
 
-        {/* Hidden canvas for frame capture */}
         <canvas ref={canvasRef} className="hidden" />
 
-        {/* ── Status tags ── */}
         <div className="absolute bottom-4 left-4 flex flex-col gap-1.5 w-[calc(100%-2rem)] md:w-auto z-10">
           <div className="px-3 py-1.5 bg-[#0b1120]/90 backdrop-blur-md border border-white/10 rounded-md text-[9px] font-mono text-gray-400 uppercase truncate">
             ENGINE: GEMINI 2.0 FLASH + DEEPFACE [SERVER-SIDE]
@@ -290,9 +272,8 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
         </div>
       </div>
 
-      {/* ── Stats row ── */}
+      {/* Stats row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 xl:gap-6 shrink-0 w-full">
-        {/* Sentiment */}
         <div className="bg-[#121b2f] border border-white/5 p-5 md:p-6 rounded-2xl flex flex-col justify-center shadow-sm relative overflow-hidden">
           <div className="flex items-center gap-2.5 mb-3">
             <svg className="w-5 h-5 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
@@ -303,8 +284,6 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
             <span className="text-xs text-gray-500 mt-1">Dominant: {liveData.dominantEmotion}</span>
           )}
         </div>
-
-        {/* Engagement */}
         <div className="bg-[#121b2f] border border-white/5 p-5 md:p-6 rounded-2xl flex flex-col justify-center shadow-sm relative overflow-hidden">
           <div className="flex items-center gap-2.5 mb-3">
             <svg className="w-5 h-5 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -317,8 +296,6 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
             <span className="text-xs text-gray-500 mt-1">DeepFace: {liveData.attentionRate}% attentive</span>
           )}
         </div>
-
-        {/* Headcount */}
         <div className="bg-[#121b2f] border border-white/5 p-5 md:p-6 rounded-2xl flex flex-col justify-center shadow-sm relative overflow-hidden">
           <div className="flex items-center gap-2.5 mb-3">
             <svg className="w-5 h-5 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
@@ -334,7 +311,7 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
         </div>
       </div>
 
-      {/* ── Source modal ── */}
+      {/* Source modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#121b2f] border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl">
@@ -342,9 +319,7 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
               {pendingType === 'youtube' ? 'YouTube Stream' : 'RTSP / IP Camera'}
             </h3>
             <p className="text-gray-400 text-sm mb-5">
-              {pendingType === 'youtube'
-                ? 'Enter a YouTube video or livestream URL.'
-                : 'Enter your RTSP or IP camera stream URL.'}
+              {pendingType === 'youtube' ? 'Enter a YouTube video or livestream URL.' : 'Enter your RTSP or IP camera stream URL.'}
             </p>
             <input
               type="text"

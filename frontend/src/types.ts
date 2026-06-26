@@ -1,5 +1,3 @@
-// ── Core Types for EduSphere AI ───────────────────────────────
-
 export interface Session {
   id: string;
   room_id: string;
@@ -17,7 +15,7 @@ export interface Alert {
   message: string;
   room_id: string;
   timestamp: string;
-  dismissed: boolean;
+  dismissed_at: string | null;
 }
 
 export interface PedagogicalAnalysis {
@@ -75,6 +73,17 @@ export interface EngagementSnapshot {
   dominant_emotion: string;
   gestures: PedagogicalAnalysis['gestures'];
   alert_level: number | null;
+}
+
+export interface AnalysisUpdate {
+  engagement: number;
+  headcount: number;
+  sentiment: string;
+  lecturerPresent: boolean;
+  gestures: PedagogicalAnalysis['gestures'] | null;
+  alert: string | null;
+  attentionRate: number | null;
+  timestamp: string;
 }
 
 export type SentimentType = 'focused' | 'distracted' | 'tired' | 'energetic' | 'mixed';
