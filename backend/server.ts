@@ -38,6 +38,9 @@ app.use(rateLimit({
 }));
 
 // ── Routes ────────────────────────────────────────────────────
+app.get("/", (req, res) => res.json({ status: "ok", message: "EduSphere API Running" }));
+app.get("/health", (req, res) => res.json({ status: "ok", message: "EduSphere API Running" }));
+
 app.use("/api/health",            healthRoutes);
 app.use("/api/analyze/gemini",    visionRoutes);
 app.use("/api/analyze/deepface",  feedRoutes);
