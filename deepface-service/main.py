@@ -1,14 +1,36 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import asyncio
 import base64
+import httpx
 import numpy as np
 import cv2
 from deepface import DeepFace
 import os
 from collections import Counter
 
-app = FastAPI(title="EduSphere DeepFace Service")
+PING_INTERVAL = 14 * 60  # 14 minutes — just under Render's 15-min spindown
+
+async def _keep_alive():
+    self_url = os.getenv("RENDER_EXTERNAL_URL", "http://localhost:8000")
+    await asyncio.sleep(60)  # let the server fully start first
+    async with httpx.AsyncClient() as client:
+        while True:
+            try:
+                await client.get(f"{self_url}/health", timeout=10)
+            except Exception:
+                pass
+            await asyncio.sleep(PING_INTERVAL)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(_keep_alive())
+    yield
+    task.cancel()
+
+app = FastAPI(title="EduSphere DeepFace Service", lifespan=lifespan)
 
 # ── CORS ──────────────────────────────────────────────────────
 # Locks to your Node.js backend only
