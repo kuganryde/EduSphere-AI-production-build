@@ -11,6 +11,7 @@ Full rebuild:
 
 from __future__ import annotations
 
+import ctypes
 import os
 import queue
 import sys
@@ -22,6 +23,19 @@ import cv2
 import numpy as np
 import streamlit as st
 import yt_dlp
+
+# ── Optional VLC binding ───────────────────────────────────────────────────────
+try:
+    import vlc as _vlc
+    _VLC_AVAILABLE = True
+except ImportError:
+    _vlc = None          # type: ignore[assignment]
+    _VLC_AVAILABLE = False
+
+# VLC frame-callback ctypes signatures (libvlc memory rendering API)
+_LockCb    = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p))
+_UnlockCb  = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p))
+_DisplayCb = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p)
 
 # ── Page config MUST be first Streamlit call ──────────────────────────────────
 st.set_page_config(
@@ -36,13 +50,13 @@ st.set_page_config(
 @st.cache_resource(show_spinner="Loading neural cores…")
 def _boot_engines() -> dict:
     eng = {
-        "pose":             None,
-        "pose_available":   False,
+        "pose":               None,
+        "pose_available":     False,
         "deepface_available": False,
+        "vlc_available":      _VLC_AVAILABLE,
     }
     try:
         from ultralytics import YOLO
-        # yolov8n-pose gives per-person bounding boxes + 17 COCO skeleton keypoints
         eng["pose"] = YOLO("yolov8n-pose.pt")
         eng["pose_available"] = True
     except Exception as e:
@@ -260,7 +274,184 @@ class FrameBuffer:
 
 
 # =============================================================================
-# 4.  ASYNC EMOTION WORKER
+# 4.  VLC RTSP CAPTURE
+#     Uses libvlc memory-rendering callbacks so VLC decodes the stream directly
+#     into a shared ctypes buffer. No subprocess, no intermediate files.
+#     VLC handles H.264/H.265 codec negotiation, RTSP-TCP fallback, and
+#     automatic buffering — all things OpenCV/FFmpeg often struggle with.
+#
+#     Exposes the same interface as FrameBuffer (.start / .stop /
+#     .read_latest / .status / .fps) so the rest of the pipeline is unchanged.
+# =============================================================================
+class VLCCapture:
+    """
+    RTSP playback via python-vlc with libvlc memory callbacks.
+
+    Frame flow:
+      VLC decoder thread
+        → _on_lock()    sets planes[0] to our ctypes pixel buffer
+        → _on_display() copies decoded RGBA pixels → BGR numpy array
+      Main loop
+        → read_latest() returns the most recent BGR frame (non-blocking)
+    """
+
+    # Fixed render resolution; VLC scales the stream to fit
+    RENDER_W = 1280
+    RENDER_H = 720
+
+    # VLC player state codes → human label
+    _STATE_MAP = {
+        0: "idle",
+        1: "opening",
+        2: "buffering",
+        3: "streaming",
+        4: "paused",
+        5: "stopped",
+        6: "ended",
+        7: "error",
+    }
+
+    def __init__(self, url: str) -> None:
+        if not _VLC_AVAILABLE:
+            raise RuntimeError(
+                "python-vlc is not installed. Run: pip install python-vlc\n"
+                "VLC media player must also be installed on this machine."
+            )
+
+        self._url  = url
+        self._lock = threading.Lock()
+        self._sl   = threading.Lock()    # status lock
+        self._frame: np.ndarray | None = None
+        self._status  = "connecting"
+        self._fps_val = 0.0
+        self._fps_times: list[float] = []
+
+        # ── Shared pixel buffer  (RGBA, 4 bytes/pixel) ────────────────────────
+        self._buf_len = self.RENDER_W * self.RENDER_H * 4
+        self._buf     = (ctypes.c_ubyte * self._buf_len)()
+        # Stable pointer used inside the lock callback
+        self._buf_ptr = ctypes.cast(ctypes.byref(self._buf), ctypes.c_void_p).value
+
+        # ── VLC instance ───────────────────────────────────────────────────────
+        self._inst = _vlc.Instance([
+            "--no-audio",
+            "--network-caching=400",      # ms of stream data to buffer
+            "--clock-jitter=0",
+            "--clock-synchro=0",
+            "--rtsp-tcp",                 # TCP is more reliable for classrooms
+            "--no-video-title-show",
+            "--quiet",
+            "--verbose=0",
+        ])
+        self._player = self._inst.media_player_new()
+
+        # ── Wire up memory-rendering callbacks ─────────────────────────────────
+        # Keep references on self to prevent garbage collection while VLC runs
+        self._cb_lock    = _LockCb(self._on_lock)
+        self._cb_unlock  = _UnlockCb(self._on_unlock)
+        self._cb_display = _DisplayCb(self._on_display)
+
+        self._player.video_set_callbacks(
+            self._cb_lock, self._cb_unlock, self._cb_display, None
+        )
+        self._player.video_set_format(
+            "RV32",                       # RGBA 32-bit; OpenCV converts to BGR
+            self.RENDER_W,
+            self.RENDER_H,
+            self.RENDER_W * 4,            # pitch = width × bytes-per-pixel
+        )
+
+        media = self._inst.media_new(url)
+        self._player.set_media(media)
+
+    # ── libvlc frame callbacks ─────────────────────────────────────────────────
+
+    def _on_lock(self, opaque, planes):
+        """Tell VLC where to write the next decoded frame."""
+        planes[0] = self._buf_ptr
+        return None  # picture token; NULL is correct for single-plane formats
+
+    def _on_unlock(self, opaque, picture, planes):
+        pass  # nothing to do — buffer is ours
+
+    def _on_display(self, opaque, picture):
+        """
+        Called by the VLC decoder thread each time a frame is ready.
+        Converts RGBA buffer → BGR numpy array and stores it thread-safely.
+        """
+        arr = np.frombuffer(self._buf, dtype=np.uint8).reshape(
+            self.RENDER_H, self.RENDER_W, 4
+        )
+        bgr = cv2.cvtColor(arr, cv2.COLOR_RGBA2BGR)
+        with self._lock:
+            self._frame = bgr
+
+        # Rolling FPS calculation
+        now = time.monotonic()
+        self._fps_times.append(now)
+        cutoff = now - 1.0
+        self._fps_times = [t for t in self._fps_times if t >= cutoff]
+        self._fps_val   = float(len(self._fps_times))
+
+    # ── Public API (identical interface to FrameBuffer) ───────────────────────
+
+    def start(self) -> "VLCCapture":
+        self._player.play()
+        self._set_status("streaming")
+        return self
+
+    def stop(self) -> None:
+        self._player.stop()
+        self._player.release()
+        self._inst.release()
+
+    def read_latest(self) -> tuple[bool, np.ndarray | None]:
+        """Non-blocking — returns (True, frame) or (False, None)."""
+        with self._lock:
+            if self._frame is None:
+                return False, None
+            return True, self._frame.copy()
+
+    @property
+    def status(self) -> str:
+        # Mirror VLC's internal player state when possible
+        if _VLC_AVAILABLE and self._player:
+            try:
+                state = self._player.get_state()
+                label = self._STATE_MAP.get(int(state), "unknown")
+                if label in ("streaming", "buffering", "opening"):
+                    return label
+                if label == "error":
+                    return "error"
+            except Exception:
+                pass
+        with self._sl:
+            return self._status
+
+    @property
+    def fps(self) -> float:
+        return self._fps_val
+
+    def _set_status(self, s: str) -> None:
+        with self._sl:
+            self._status = s
+
+
+# =============================================================================
+# 4b. SOURCE FACTORY
+#     Routes RTSP/RTSPS to VLCCapture (when available) and everything else
+#     (YouTube, local file, webcam index) to FrameBuffer.
+# =============================================================================
+def create_source(path: str):
+    """Returns a started VLCCapture or FrameBuffer depending on source type."""
+    p = path.strip()
+    if _VLC_AVAILABLE and p.startswith(("rtsp://", "rtsps://")):
+        return VLCCapture(p).start()
+    return FrameBuffer(p).start()
+
+
+# =============================================================================
+# 5.  ASYNC EMOTION WORKER
 #     Runs DeepFace on head-crops in a daemon thread; the main loop picks up
 #     results whenever they're ready — zero blocking.
 # =============================================================================
@@ -593,6 +784,10 @@ with st.sidebar:
         st.error("ultralytics not found. Install: `pip install ultralytics`")
     if not ENGINES["deepface_available"]:
         st.warning("deepface not found — emotion analysis disabled. Install: `pip install deepface`")
+    if ENGINES["vlc_available"]:
+        st.success("VLC ✓ — RTSP streams will use libvlc playback")
+    else:
+        st.info("python-vlc not found — RTSP falls back to OpenCV. Install: `pip install python-vlc`")
 
     src_type = st.radio("Video Input", ["RTSP / YouTube URL", "Upload Local File"])
 
@@ -658,7 +853,7 @@ b_students   = bc[3].empty()
 # 9.  MAIN EXECUTION LOOP
 # =============================================================================
 if start_engine and final_src:
-    buf    = FrameBuffer(final_src).start()
+    buf    = create_source(final_src)   # VLCCapture for rtsp://, FrameBuffer otherwise
     worker = EmotionWorker()
     mog2   = cv2.createBackgroundSubtractorMOG2(
         history=500, varThreshold=25, detectShadows=False
@@ -680,9 +875,11 @@ if start_engine and final_src:
     while start_engine:
         # ── Status banner ──────────────────────────────────────────────────────
         bstatus = buf.status
-        if bstatus != "streaming":
+        if bstatus not in ("streaming", "buffering"):
             status_bar.warning(
-                f"Stream {bstatus}… FPS: {buf.fps:.1f}  —  Detection paused until feed stabilises."
+                f"Stream {bstatus}… FPS: {buf.fps:.1f}  —  "
+                + ("VLC connecting via RTSP-TCP…" if isinstance(buf, VLCCapture)
+                   else "Detection paused until feed stabilises.")
             )
             time.sleep(0.05)
             continue

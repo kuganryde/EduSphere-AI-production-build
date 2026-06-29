@@ -5,4 +5,5 @@ deepface>=0.0.93
 yt-dlp>=2024.5.1
 numpy>=1.26.0
 tf-keras>=2.15.0
+python-vlc>=3.0.20301   # requires VLC media player installed on the OS
 # yolov8n-pose.pt is auto-downloaded by ultralytics on first run
