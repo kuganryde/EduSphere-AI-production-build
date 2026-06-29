@@ -25,7 +25,7 @@ services:
       - key: DEEPFACE_API_URL
         sync: false
       - key: FRONTEND_URL
-        value: https://eduspheredetection.netlify.app
+        value: https://eduspherevision.netlify.app
 
   - type: web
     name: edusphere-deepface
