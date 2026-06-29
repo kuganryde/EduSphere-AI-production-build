@@ -23,7 +23,6 @@ export default function LoginModal() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!key.trim()) return;
     setLoading(true);
     setError('');
     const { ok, error: err } = await login(key.trim());
@@ -34,30 +33,41 @@ export default function LoginModal() {
   return (
     <div
       className="min-h-screen flex relative overflow-hidden"
-      style={{ background: '#04080f' }}
+      style={{ background: '#030710' }}
     >
+      {/* ── Grid overlay ──────────────────────────────────────────── */}
+      <div className="absolute inset-0 bg-hud-grid" style={{ opacity: 0.8 }} />
+
       {/* ── Ambient orbs ──────────────────────────────────────────── */}
       <div className="orb" style={{
-        width: 600, height: 600,
-        background: 'radial-gradient(circle, rgba(37,99,235,0.18) 0%, transparent 70%)',
-        top: -150, left: -100, animationDuration: '14s',
-        filter: 'blur(60px)',
+        width: 700, height: 700,
+        background: 'radial-gradient(circle, rgba(37,99,235,0.22) 0%, transparent 65%)',
+        top: -200, left: -150, animationDuration: '14s',
+        filter: 'blur(55px)',
       }} />
       <div className="orb" style={{
-        width: 500, height: 500,
-        background: 'radial-gradient(circle, rgba(99,102,241,0.14) 0%, transparent 70%)',
-        bottom: -120, right: '5%', animationDuration: '18s', animationDelay: '-6s',
-        filter: 'blur(70px)',
+        width: 550, height: 550,
+        background: 'radial-gradient(circle, rgba(99,102,241,0.16) 0%, transparent 68%)',
+        bottom: -130, right: '3%', animationDuration: '18s', animationDelay: '-6s',
+        filter: 'blur(65px)',
       }} />
       <div className="orb" style={{
-        width: 360, height: 360,
-        background: 'radial-gradient(circle, rgba(6,182,212,0.10) 0%, transparent 70%)',
+        width: 400, height: 400,
+        background: 'radial-gradient(circle, rgba(6,182,212,0.12) 0%, transparent 70%)',
         top: '45%', left: '35%', animationDuration: '22s', animationDelay: '-11s',
+        filter: 'blur(75px)',
+      }} />
+      <div className="orb" style={{
+        width: 300, height: 300,
+        background: 'radial-gradient(circle, rgba(167,139,250,0.10) 0%, transparent 70%)',
+        top: '20%', right: '15%', animationDuration: '26s', animationDelay: '-8s',
         filter: 'blur(80px)',
       }} />
 
-      {/* ── Dot-grid overlay ──────────────────────────────────────── */}
-      <div className="absolute inset-0 bg-dot-grid" style={{ opacity: 0.35 }} />
+      {/* ── Scanline diagonal overlay ─────────────────────────────── */}
+      <div className="absolute inset-0 bg-dot-grid" style={{ opacity: 0.25 }} />
+      {/* Bottom gradient fade */}
+      <div className="absolute bottom-0 left-0 right-0 h-32" style={{ background: 'linear-gradient(0deg, rgba(3,7,16,0.8), transparent)', pointerEvents: 'none' }} />
 
       {/* ── Left hero panel ───────────────────────────────────────── */}
       <div
@@ -150,9 +160,12 @@ export default function LoginModal() {
         style={{ width: '100%', maxWidth: '100%', padding: '32px 24px' }}
       >
         <div
-          className="glass-card rounded-2xl fade-up"
+          className="glass-card rounded-2xl fade-up relative overflow-hidden"
           style={{ width: '100%', maxWidth: 400, padding: 36 }}
         >
+          {/* Top gradient accent line */}
+          <div className="absolute top-0 left-0 right-0 h-px"
+               style={{ background: 'linear-gradient(90deg, transparent, var(--brand) 30%, var(--indigo) 60%, var(--cyan) 85%, transparent)', opacity: 0.8 }} />
           {/* Mobile-only logo */}
           <div className="flex lg:hidden flex-col items-center mb-8 text-center">
             <div
@@ -174,7 +187,7 @@ export default function LoginModal() {
               Institutional Access
             </h2>
             <p className="text-sm" style={{ color: 'rgba(148,163,184,0.70)' }}>
-              Enter your access key to reach the monitoring system.
+              Enter your access key, or leave blank if your server runs in open-access mode.
             </p>
           </div>
 
@@ -233,13 +246,13 @@ export default function LoginModal() {
 
             <button
               type="submit"
-              disabled={loading || !key.trim()}
-              className="w-full py-3.5 rounded-xl text-white text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              disabled={loading}
+              className="w-full py-3.5 rounded-xl text-white text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed relative overflow-hidden"
               style={{
                 background: loading
                   ? 'rgba(59,130,246,0.5)'
                   : 'linear-gradient(135deg, #2563eb 0%, #6366f1 100%)',
-                boxShadow: key.trim() && !loading ? '0 4px 20px rgba(37,99,235,0.40)' : 'none',
+                boxShadow: !loading ? '0 4px 28px rgba(37,99,235,0.50), inset 0 1px 0 rgba(255,255,255,0.15)' : 'none',
               }}
             >
               {loading ? (

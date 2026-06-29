@@ -121,35 +121,40 @@ function TopNav({
   const isLive   = !!liveStats?.headcount;
 
   return (
-    <div className="top-nav">
+    <div className="top-nav" style={{ position: 'relative' }}>
       {/* Logo ────────────────────────────── */}
       <div className="flex items-center gap-2.5 shrink-0 mr-4" style={{ minWidth: 0 }}>
-        <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-          style={{ background: 'linear-gradient(135deg, #2563eb, #6366f1)', boxShadow: '0 2px 10px rgba(37,99,235,0.4)' }}
-        >
-          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M9.663 17h4.673M12 3v1m6.364 1.636-.707.707M21 12h-1M4 12H3m3.343-5.657-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-          </svg>
+        {/* Logo mark with glow ring */}
+        <div className="relative shrink-0">
+          <div
+            className="absolute inset-0 rounded-lg"
+            style={{ background: 'linear-gradient(135deg, #2563eb, #6366f1)', filter: 'blur(6px)', opacity: 0.55, transform: 'scale(1.1)' }}
+          />
+          <div
+            className="relative w-8 h-8 rounded-lg flex items-center justify-center"
+            style={{ background: 'linear-gradient(135deg, #2563eb, #6366f1)', boxShadow: '0 2px 12px rgba(37,99,235,0.5), inset 0 1px 0 rgba(255,255,255,0.15)' }}
+          >
+            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M9.663 17h4.673M12 3v1m6.364 1.636-.707.707M21 12h-1M4 12H3m3.343-5.657-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+          </div>
         </div>
         <div className="hidden sm:block">
-          <p className="text-xs font-bold leading-tight" style={{ color: 'rgba(240,246,255,0.92)' }}>EduSphere AI</p>
-          <p className="text-[9px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'rgba(99,102,241,0.75)' }}>
+          <p className="text-xs font-bold leading-tight tracking-tight" style={{ color: '#f0f6ff' }}>EduSphere AI</p>
+          <p className="text-[9px] font-bold uppercase tracking-[0.18em]" style={{ color: 'rgba(99,102,241,0.80)' }}>
             Classroom Intelligence
           </p>
         </div>
       </div>
 
       {/* Divider */}
-      <div className="w-px h-6 shrink-0" style={{ background: 'var(--border-1)' }} />
+      <div className="w-px h-5 shrink-0" style={{ background: 'var(--border-1)' }} />
 
       {/* Page breadcrumb */}
       <div className="hidden md:flex items-center gap-1.5 px-2 shrink-0">
-        <span className="text-[10px] uppercase tracking-widest font-medium" style={{ color: 'var(--text-3)' }}>
-          /
-        </span>
-        <span className="text-xs font-semibold" style={{ color: 'var(--text-1)' }}>
+        <span className="text-[10px] font-mono" style={{ color: 'var(--text-3)' }}>/</span>
+        <span className="text-[11px] font-semibold" style={{ color: 'var(--text-1)' }}>
           {PAGE_LABEL[page]}
         </span>
       </div>
@@ -161,19 +166,22 @@ function TopNav({
       {isLive && (
         <div className="hidden lg:flex items-center gap-1 mr-2">
           {[
-            { val: `${liveStats?.engagement ?? 0}%`, label: 'ENG', color: liveStats!.engagement > 70 ? 'var(--success)' : liveStats!.engagement > 40 ? 'var(--warning)' : 'var(--danger)' },
-            { val: `${liveStats?.headcount ?? 0}`, label: 'HEAD', color: 'var(--brand)' },
-            { val: liveStats?.attentionRate != null ? `${liveStats.attentionRate}%` : '—', label: 'ATT', color: 'var(--cyan)' },
+            { val: `${liveStats?.engagement ?? 0}%`, label: 'ENG', color: liveStats!.engagement > 70 ? '#10b981' : liveStats!.engagement > 40 ? '#f59e0b' : '#ef4444' },
+            { val: `${liveStats?.headcount ?? 0}`, label: 'HEAD', color: '#3b82f6' },
+            { val: liveStats?.attentionRate != null ? `${liveStats.attentionRate}%` : '—', label: 'ATT', color: '#22d3ee' },
           ].map(m => (
             <div
               key={m.label}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg"
-              style={{ background: 'var(--surface-3)', border: '1px solid var(--border-0)' }}
+              style={{
+                background: `${m.color}0f`,
+                border: `1px solid ${m.color}28`,
+              }}
             >
-              <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-3)' }}>
+              <span className="text-[9px] font-bold uppercase tracking-wider font-mono" style={{ color: `${m.color}99` }}>
                 {m.label}
               </span>
-              <span className="text-xs font-bold" style={{ color: m.color }}>{m.val}</span>
+              <span className="text-xs font-bold font-mono" style={{ color: m.color }}>{m.val}</span>
             </div>
           ))}
         </div>
@@ -259,35 +267,36 @@ function TopNav({
         {isDark ? <IconSun /> : <IconMoon />}
       </button>
 
-      {/* Role badge */}
-      {!openMode && roleMeta && (
-        <div
-          className="hidden lg:flex items-center gap-2 px-2.5 py-1.5 rounded-xl shrink-0"
-          style={{ background: 'var(--surface-3)', border: '1px solid var(--border-1)' }}
-        >
-          <div
-            className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold"
-            style={{ background: 'var(--surface-4)', color: roleMeta.color }}
-          >
-            {(role ?? 'V')[0].toUpperCase()}
-          </div>
-          <div>
-            <p className="text-[10px] font-semibold leading-tight" style={{ color: roleMeta.color }}>
-              {roleMeta.label}
+      {/* User / logout — always visible */}
+      <div
+        className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl shrink-0"
+        style={{ background: 'var(--surface-3)', border: '1px solid var(--border-1)' }}
+      >
+        {roleMeta && (
+          <>
+            <div
+              className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold"
+              style={{ background: 'var(--surface-4)', color: openMode ? 'var(--cyan)' : roleMeta.color }}
+            >
+              {openMode ? '○' : (role ?? 'V')[0].toUpperCase()}
+            </div>
+            <p className="hidden lg:block text-[10px] font-semibold leading-tight"
+               style={{ color: openMode ? 'var(--cyan)' : roleMeta.color }}>
+              {openMode ? 'Open Access' : roleMeta.label}
             </p>
-          </div>
-          <button
-            onClick={onLogout}
-            className="ml-1 flex items-center justify-center transition-colors"
-            style={{ color: 'var(--text-3)' }}
-            onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = '#f87171')}
-            onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = 'var(--text-3)')}
-            title="Sign out"
-          >
-            <IconSignOut />
-          </button>
-        </div>
-      )}
+          </>
+        )}
+        <button
+          onClick={onLogout}
+          className="flex items-center justify-center transition-colors"
+          style={{ color: 'var(--text-3)' }}
+          onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = '#f87171')}
+          onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = 'var(--text-3)')}
+          title="Sign out"
+        >
+          <IconSignOut />
+        </button>
+      </div>
     </div>
   );
 }
@@ -336,17 +345,16 @@ function AppShell() {
           {/* Institute label */}
           <div className="hidden lg:flex items-center gap-2 px-4 py-3"
                style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-            <div className="w-1 h-1 rounded-full" style={{ background: 'var(--brand)' }} />
-            <p className="text-[9px] font-bold uppercase tracking-[0.16em]"
-               style={{ color: 'rgba(99,102,241,0.65)' }}>
+            <div className="w-1.5 h-1.5 rounded-full neon-pulse" style={{ background: 'var(--brand)', boxShadow: '0 0 6px var(--brand-glow)' }} />
+            <p className="text-[9px] font-bold uppercase tracking-[0.18em] gradient-text">
               University Platform
             </p>
           </div>
 
           {/* Nav items */}
           <div className="flex-1 py-3 px-2 flex flex-col gap-0.5 overflow-y-auto no-scrollbar">
-            <p className="hidden lg:block px-2 pt-1 pb-2 text-[8px] font-bold uppercase tracking-[0.18em]"
-               style={{ color: 'rgba(255,255,255,0.20)' }}>
+            <p className="hidden lg:block px-2 pt-1 pb-2 text-[8px] font-bold uppercase tracking-[0.20em]"
+               style={{ color: 'rgba(255,255,255,0.18)' }}>
               Navigation
             </p>
             {NAV.map(item => {
@@ -359,13 +367,13 @@ function AppShell() {
                   title={item.label}
                   className={`nav-item${active ? ' active' : ''}`}
                 >
-                  <span className="w-4 h-4 shrink-0"><item.Icon /></span>
+                  <span className="w-4 h-4 shrink-0" style={{ color: active ? 'var(--brand)' : 'inherit' }}>
+                    <item.Icon />
+                  </span>
                   <div className="hidden lg:block min-w-0 flex-1">
-                    <p className="text-[12px] font-medium leading-tight truncate">{item.label}</p>
-                    <p className="text-[9px] leading-tight truncate opacity-50">{item.sub}</p>
+                    <p className="text-[12px] font-semibold leading-tight truncate">{item.label}</p>
+                    <p className="text-[9px] leading-tight truncate" style={{ opacity: 0.40 }}>{item.sub}</p>
                   </div>
-                  {active && <div className="hidden lg:block ml-auto w-0.5 h-4 rounded-full shrink-0"
-                                   style={{ background: 'var(--brand)' }} />}
                 </button>
               );
             })}
@@ -374,25 +382,31 @@ function AppShell() {
           {/* Footer */}
           <div className="shrink-0 px-2 pb-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
             {/* Role badge */}
-            {!openMode && role && ROLE_CONFIG[role] && (
+            {role && ROLE_CONFIG[role] && (
               <div className="flex items-center gap-2 px-2 py-2 rounded-xl mb-1 mt-3"
-                   style={{ background: 'rgba(255,255,255,0.04)' }}>
+                   style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div className="relative shrink-0">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold"
-                       style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: ROLE_CONFIG[role].color }}>
+                  <div
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold"
+                    style={{
+                      background: `${ROLE_CONFIG[role].color}18`,
+                      border: `1px solid ${ROLE_CONFIG[role].color}35`,
+                      color: ROLE_CONFIG[role].color,
+                    }}
+                  >
                     {role[0].toUpperCase()}
                   </div>
                   <div
-                    className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2"
+                    className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 live-dot"
                     style={{ background: ROLE_CONFIG[role].dot, borderColor: 'var(--surface-1)' }}
                   />
                 </div>
                 <div className="hidden lg:block min-w-0 flex-1">
                   <p className="text-[11px] font-semibold leading-tight truncate"
                      style={{ color: ROLE_CONFIG[role].color }}>
-                    {ROLE_CONFIG[role].label}
+                    {openMode ? 'Open Access' : ROLE_CONFIG[role].label}
                   </p>
-                  <p className="text-[9px] leading-tight" style={{ color: 'rgba(255,255,255,0.25)' }}>
+                  <p className="text-[9px] font-mono leading-tight" style={{ color: 'rgba(255,255,255,0.22)' }}>
                     {isDark ? 'Night' : 'Day'} Mode
                   </p>
                 </div>

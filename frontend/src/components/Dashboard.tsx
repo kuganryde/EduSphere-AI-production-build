@@ -256,45 +256,49 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
       label: 'Engagement',
       value: stats.engagement ? `${stats.engagement}%` : '—',
       color: engColor,
+      accent: stats.engagement > 79 ? 'linear-gradient(90deg,#10b981,#06b6d4)' : stats.engagement > 49 ? 'linear-gradient(90deg,#f59e0b,#fb923c)' : stats.engagement > 0 ? 'linear-gradient(90deg,#ef4444,#f97316)' : 'linear-gradient(90deg,#1e3a5f,#1e3a5f)',
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
             d="M13 10V3L4 14h7v7l9-11h-7z" />
         </svg>
       ),
-      sub: stats.engagement > 0 ? (stats.engagement > 70 ? 'Strong' : stats.engagement > 40 ? 'Moderate' : 'Low') : 'No feed',
+      sub: stats.engagement > 0 ? (stats.engagement > 70 ? 'Strong signal' : stats.engagement > 40 ? 'Moderate' : 'Low signal') : 'No feed active',
       bar: stats.engagement,
     },
     {
       label: 'Headcount',
       value: stats.headcount ? `${stats.headcount}` : '—',
       color: 'var(--brand)',
+      accent: 'linear-gradient(90deg,#3b82f6,#6366f1)',
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
             d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
       ),
-      sub: stats.headcount ? `of ${ROOM_CAPACITY} capacity` : 'No feed',
+      sub: stats.headcount ? `of ${ROOM_CAPACITY} capacity` : 'No feed active',
       bar: stats.headcount ? Math.round(stats.headcount / ROOM_CAPACITY * 100) : 0,
     },
     {
       label: 'Attention',
       value: stats.attentionRate != null ? `${stats.attentionRate}%` : '—',
       color: stats.attentionRate != null ? (stats.attentionRate > 70 ? 'var(--success)' : stats.attentionRate > 40 ? 'var(--warning)' : 'var(--danger)') : 'var(--text-3)',
+      accent: 'linear-gradient(90deg,#22d3ee,#06b6d4)',
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
             d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
         </svg>
       ),
-      sub: stats.attentionRate != null ? 'Face attention rate' : 'No feed',
+      sub: stats.attentionRate != null ? 'Face attention rate' : 'No feed active',
       bar: stats.attentionRate ?? 0,
     },
     {
       label: 'Sentiment',
       value: stats.sentiment,
       color: stats.sentiment === 'Positive' ? 'var(--success)' : stats.sentiment === 'Negative' ? 'var(--danger)' : stats.sentiment !== '—' ? 'var(--text-1)' : 'var(--text-3)',
+      accent: 'linear-gradient(90deg,#a78bfa,#6366f1)',
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
@@ -308,6 +312,7 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
       label: 'Lecturer',
       value: stats.headcount > 0 ? (stats.lecturerPresent ? 'Present' : 'Absent') : '—',
       color: stats.headcount > 0 ? (stats.lecturerPresent ? 'var(--success)' : 'var(--warning)') : 'var(--text-3)',
+      accent: stats.headcount > 0 ? (stats.lecturerPresent ? 'linear-gradient(90deg,#10b981,#059669)' : 'linear-gradient(90deg,#f59e0b,#d97706)') : 'linear-gradient(90deg,#1e3a5f,#1e3a5f)',
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
@@ -321,13 +326,14 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
       label: 'Alert',
       value: stats.alert ? stats.alert.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase()) : (stats.headcount > 0 ? 'None' : '—'),
       color: stats.alert ? 'var(--danger)' : stats.headcount > 0 ? 'var(--success)' : 'var(--text-3)',
+      accent: stats.alert ? 'linear-gradient(90deg,#ef4444,#ec4899)' : stats.headcount > 0 ? 'linear-gradient(90deg,#10b981,#059669)' : 'linear-gradient(90deg,#1e3a5f,#1e3a5f)',
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
             d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
         </svg>
       ),
-      sub: stats.alert ? 'Action required' : 'System status',
+      sub: stats.alert ? 'Action required' : (stats.headcount > 0 ? 'All clear' : 'System idle'),
       bar: stats.alert ? 100 : 0,
     },
   ];
@@ -357,7 +363,7 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
 
       {/* ── Session info bar ─────────────────────────────────── */}
       <div
-        className="px-5 py-2.5 shrink-0 flex items-center justify-between gap-3"
+        className="px-5 py-2.5 shrink-0 flex items-center justify-between gap-3 relative"
         style={{ background: 'var(--surface-1)', borderBottom: '1px solid var(--border-0)' }}
       >
         <div className="flex items-center gap-3 min-w-0">
@@ -415,6 +421,10 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
 
       {/* ── Camera Source Strip (hidden in demo mode) ───────── */}
       <div className={`px-5 pt-4 pb-0 shrink-0 ${isDemoMode ? 'hidden' : ''}`}>
+        <div className="section-label mb-3">
+          <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--brand)', boxShadow: '0 0 6px var(--brand-glow)' }} />
+          Live Feeds
+        </div>
         <div className="flex items-center gap-3 overflow-x-auto pb-3 no-scrollbar">
           {slots.map(slot => {
             const style   = SLOT_STYLE[slot.type];
@@ -542,14 +552,26 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
 
       {/* ── AI Insights strip ────────────────────────────────── */}
       <div
-        className="mx-5 mb-3 rounded-2xl px-4 py-3 flex items-start gap-3"
-        style={{ background: 'var(--surface-2)', border: '1px solid var(--border-0)' }}
+        className="mx-5 mb-3 rounded-2xl px-4 py-3 flex items-start gap-3 relative overflow-hidden"
+        style={{
+          background: 'linear-gradient(135deg, var(--surface-2) 0%, var(--surface-3) 100%)',
+          border: '1px solid rgba(99,102,241,0.22)',
+          boxShadow: '0 0 20px rgba(99,102,241,0.06)',
+        }}
       >
-        <div className="shrink-0 flex items-center gap-1.5 mr-1 mt-0.5">
-          <span className="text-[9px] font-bold uppercase tracking-widest" style={{ color: 'var(--indigo)' }}>
-            AI
-          </span>
-          <div className="w-px h-3" style={{ background: 'var(--border-1)' }} />
+        {/* Gradient top accent */}
+        <div className="absolute top-0 left-0 right-0 h-px"
+             style={{ background: 'linear-gradient(90deg, transparent, var(--indigo), var(--brand), transparent)', opacity: 0.6 }} />
+        <div className="shrink-0 flex items-center gap-2 mr-1 mt-0.5">
+          <div
+            className="flex items-center gap-1.5 px-2 py-1 rounded-lg"
+            style={{ background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(99,102,241,0.28)' }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full neon-pulse" style={{ background: '#a78bfa', boxShadow: '0 0 6px rgba(167,139,250,0.60)' }} />
+            <span className="text-[9px] font-black uppercase tracking-[0.16em]" style={{ color: '#a78bfa' }}>
+              AI
+            </span>
+          </div>
         </div>
         <div className="flex flex-wrap gap-2 min-w-0">
           {insights.map((ins, i) => (
@@ -564,26 +586,24 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
       {/* ── KPI Row ──────────────────────────────────────────── */}
       <div className="px-5 mb-4 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
         {kpis.map(kpi => (
-          <div key={kpi.label} className="kpi-card">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[9px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-2)' }}>
+          <div
+            key={kpi.label}
+            className="kpi-card"
+            style={{ '--kpi-accent': kpi.accent } as React.CSSProperties}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[9px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-2)' }}>
                 {kpi.label}
               </span>
-              <span style={{ color: kpi.color, opacity: 0.7 }}>{kpi.icon}</span>
+              <span style={{ color: kpi.color, opacity: 0.65 }}>{kpi.icon}</span>
             </div>
-            <p className="text-xl font-black leading-none mb-1.5" style={{ color: kpi.color }}>
+            <p className="font-black leading-none mb-2 font-mono" style={{ fontSize: 22, color: kpi.color, letterSpacing: '-0.04em' }}>
               {kpi.value}
             </p>
-            <div className="eng-bar mb-1.5">
-              <div className="eng-bar-fill" style={{
-                width: `${kpi.bar}%`,
-                background: kpi.color === 'var(--danger)' ? 'linear-gradient(90deg, #ef4444, #f97316)'
-                  : kpi.color === 'var(--success)' ? 'linear-gradient(90deg, #10b981, #06b6d4)'
-                  : kpi.color === 'var(--warning)' ? 'linear-gradient(90deg, #f59e0b, #fb923c)'
-                  : 'linear-gradient(90deg, var(--brand), var(--indigo))',
-              }} />
+            <div className="eng-bar mb-2">
+              <div className="eng-bar-fill" style={{ width: `${kpi.bar}%`, background: kpi.accent }} />
             </div>
-            <p className="text-[9px]" style={{ color: 'var(--text-3)' }}>{kpi.sub}</p>
+            <p className="text-[9px] font-mono truncate" style={{ color: 'var(--text-3)' }}>{kpi.sub}</p>
           </div>
         ))}
       </div>
@@ -644,6 +664,10 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
         </div>
 
         {/* Row 2: charts */}
+        <div className="section-label mb-1">
+          <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--indigo)', boxShadow: '0 0 6px rgba(99,102,241,0.60)' }} />
+          Analytics
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <div className="xl:col-span-2">
             <EmotionTimelineChart data={emotionHistory} />
@@ -668,9 +692,11 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
 
         {/* Footer system info */}
         <div
-          className="rounded-2xl px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-1"
+          className="rounded-2xl px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-1 relative overflow-hidden"
           style={{ background: 'var(--surface-1)', border: '1px solid var(--border-0)' }}
         >
+          <div className="absolute top-0 left-0 right-0 h-px"
+               style={{ background: 'linear-gradient(90deg, transparent, var(--brand), var(--indigo), var(--cyan), transparent)', opacity: 0.30 }} />
           {[
             { label: 'Platform', val: 'EduSphere AI v3' },
             { label: 'Models', val: 'Gemini 2.0 · HSEmotion B2 · YOLOv11-Pose · YOLO-World' },

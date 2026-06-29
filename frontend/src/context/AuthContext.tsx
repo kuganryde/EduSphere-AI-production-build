@@ -25,14 +25,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     role: null, permissions: [], isAuthenticated: false, openMode: false,
   });
 
-  // On mount, try to restore from storage
+  // On mount, restore a previously saved key — never auto-verify with an empty key
   useEffect(() => {
     const stored = sessionStorage.getItem(STORAGE_KEY);
     if (stored) verify(stored);
-    else {
-      // Check if server runs in open mode (no keys configured)
-      verify('');
-    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function verify(key: string): Promise<{ ok: boolean; error?: string }> {
@@ -51,9 +47,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (key) sessionStorage.setItem(STORAGE_KEY, key);
       return { ok: true };
     } catch {
-      // Backend unreachable — allow open mode for dev
-      setAuth({ role: 'admin', permissions: ['view_dashboard', 'manage_sessions', 'view_analytics', 'view_reports', 'view_audit_logs', 'operator_mode'], isAuthenticated: true, openMode: true });
-      return { ok: true };
+      // Backend unreachable — stay logged out, show login modal
+      setAuth({ role: null, permissions: [], isAuthenticated: false, openMode: false });
+      return { ok: false, error: 'Cannot reach the server. Check your connection.' };
     }
   }
 

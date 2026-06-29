@@ -24,6 +24,9 @@ from pydantic import BaseModel
 log = logging.getLogger("edusphere_sidecar")
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
 
+# Suppress OpenCV/FFmpeg H.264 decoder noise (co located POCs, mmco, missing ref)
+os.environ.setdefault("OPENCV_FFMPEG_LOGLEVEL", "quiet")
+
 # ── Constants ───────────────────────────────────────────────────────────────────
 PING_INTERVAL = 14 * 60  # keep-alive: just under Render's 15-min spindown
 
@@ -157,9 +160,9 @@ def _kps_to_face_box(
     x2, y2 = int(cx + pad),        int(cy + pad * 1.3)  # chin room
 
     # Attention: nose + at least one eye visible → facing camera
-    nose_ok = kps[KP_NOSE,  2] > KP_CONF_THRESH
-    leye_ok = kps[KP_LEYE, 2] > KP_CONF_THRESH
-    reye_ok = kps[KP_REYE, 2] > KP_CONF_THRESH
+    nose_ok = bool(kps[KP_NOSE, 2] > KP_CONF_THRESH)
+    leye_ok = bool(kps[KP_LEYE, 2] > KP_CONF_THRESH)
+    reye_ok = bool(kps[KP_REYE, 2] > KP_CONF_THRESH)
     attention = nose_ok and (leye_ok or reye_ok)
 
     return (x1, y1, x2, y2), attention
@@ -215,7 +218,7 @@ def _analyze_frame(frame: np.ndarray) -> dict:
                         faces.append({
                             "box": {"x": fx1, "y": fy1, "w": fx2 - fx1, "h": fy2 - fy1},
                             "emotion":    emotion,
-                            "attention":  attention,
+                            "attention":  bool(attention),
                             "confidence": round(conf_e, 3),
                         })
 
