@@ -4,6 +4,8 @@ import { requireRole } from "../middleware/rbac";
 
 const router = Router();
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // GET /api/alerts — viewer+ can see their room's alerts
 router.get("/", requireRole("viewer"), async (req, res) => {
   const { room_id, session_id, limit = "50", dismissed } = req.query;
@@ -14,13 +16,14 @@ router.get("/", requireRole("viewer"), async (req, res) => {
     .order("created_at", { ascending: false })
     .limit(parseInt(limit as string, 10));
 
-  if (room_id)   query = query.eq("room_id", room_id);
-  if (session_id) query = query.eq("session_id", session_id);
+  // Only apply UUID filters if the value is a valid UUID — prevents 500 on string room codes
+  if (room_id   && UUID_RE.test(room_id as string))   query = query.eq("room_id", room_id);
+  if (session_id && UUID_RE.test(session_id as string)) query = query.eq("session_id", session_id);
   if (dismissed === "false") query = query.is("dismissed_at", null);
 
   const { data, error } = await query;
   if (error) { res.status(500).json({ error: error.message }); return; }
-  res.json(data);
+  res.json(data ?? []);
 });
 
 // PATCH /api/alerts/dismiss-all — must be BEFORE /:id route to avoid conflict

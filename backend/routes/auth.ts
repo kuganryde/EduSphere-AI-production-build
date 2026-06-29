@@ -8,14 +8,14 @@ const router = Router();
  * Returns { role, permissions } so the frontend can build its navigation.
  */
 router.post("/verify", (req, res) => {
-  const { key } = req.body;
-  if (!key) { res.status(400).json({ error: "key is required" }); return; }
-
   const openMode = !process.env.ADMIN_KEY && !process.env.OPERATOR_KEY && !process.env.VIEWER_KEY;
   if (openMode) {
     res.json({ role: "admin", permissions: allPermissions("admin"), open_mode: true });
     return;
   }
+
+  const { key } = req.body;
+  if (!key) { res.status(401).json({ error: "Access key required" }); return; }
 
   const role = resolveRole(key);
   if (!role) { res.status(401).json({ error: "Invalid access key" }); return; }
