@@ -343,7 +343,7 @@ export default function AnalyticsPage() {
                         fontSize={10}
                         tickLine={false}
                         axisLine={false}
-                        tick={{ fill: 'var(--text-1)', fontWeight: 600, textTransform: 'capitalize' }}
+                        tick={{ fill: 'var(--text-1)', fontWeight: 600 }}
                         width={50}
                       />
                       <Tooltip
