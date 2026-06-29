@@ -22,6 +22,8 @@ interface CameraSlot {
 export interface TriggerSource {
   type: SlotType;
   url?: string;
+  file?: File;           // for upload slots
+  stop?: boolean;        // when true, RoomCard stops the active feed
   nonce: number;         // increment to re-trigger same slot
 }
 
@@ -144,13 +146,14 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
     const file = e.target.files?.[0];
     if (!file) return;
     setActiveSlotKey('upload');
-    setTrigger({ type: 'upload', nonce: Date.now() });
+    setTrigger({ type: 'upload', file, nonce: Date.now() });
     e.target.value = '';
   };
 
   const stopActive = () => {
     setActiveSlotKey(null);
-    setTrigger(null);
+    // Send explicit stop signal so RoomCard tears down its active stream
+    setTrigger({ type: 'webcam', stop: true, nonce: Date.now() });
     setStats({ engagement: 0, headcount: 0, sentiment: '—', lecturerPresent: false, gestures: null, alert: null, attentionRate: null });
   };
 

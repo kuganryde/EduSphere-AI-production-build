@@ -149,10 +149,35 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
   // ── External trigger from Dashboard camera strip ──────────────
   useEffect(() => {
     if (!triggerSource) return;
-    stopSource();
-    if (triggerSource.type === 'webcam') startWebcam();
-    else if (triggerSource.type === 'rtsp' && triggerSource.url) startRtspPolling(triggerSource.url);
-    // 'upload' is handled by externalFileInput in Dashboard
+
+    // Inline cleanup via refs — avoids stale closure on stopSource
+    if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
+    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
+    sseRef.current?.close(); sseRef.current = null;
+    if (videoRef.current) { videoRef.current.pause(); videoRef.current.srcObject = null; videoRef.current.src = ''; }
+    if (uploadObjRef.current) { URL.revokeObjectURL(uploadObjRef.current); uploadObjRef.current = null; }
+    setSource(null);
+    setDetection({ faces: [], persons: [], frameWidth: 0, frameHeight: 0 });
+
+    // stop=true means Dashboard wants the feed stopped (Stop Feed button)
+    if (triggerSource.stop) return;
+
+    if (triggerSource.type === 'webcam') {
+      startWebcam();
+    } else if (triggerSource.type === 'rtsp' && triggerSource.url) {
+      // setSource triggers the source-watching useEffect which calls startRtspPolling
+      setSource({ type: 'rtsp', url: triggerSource.url });
+    } else if (triggerSource.type === 'upload' && triggerSource.file) {
+      const objUrl = URL.createObjectURL(triggerSource.file);
+      uploadObjRef.current = objUrl;
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+        videoRef.current.src = objUrl;
+        videoRef.current.loop = true;
+        videoRef.current.play().catch(() => {});
+      }
+      setSource({ type: 'upload', fileName: triggerSource.file.name });
+    }
   }, [triggerSource?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Redraw overlay on detection change
