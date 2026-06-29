@@ -1,9 +1,11 @@
 import { Router } from "express";
 import { supabase } from "../supabase_service";
+import { requireRole } from "../middleware/rbac";
+import { logAudit } from "./audit";
 
 const router = Router();
 
-router.post("/", async (req, res) => {
+router.post("/", requireRole("operator"), async (req, res) => {
   const { room_id, lecturer_name, course_code, expected_capacity } = req.body;
 
   if (!lecturer_name || !course_code) {
@@ -22,10 +24,11 @@ router.post("/", async (req, res) => {
     return;
   }
 
+  await logAudit({ action: "start_session", resource: "session", resource_id: data.id, role: (req as any).role, ip: req.ip, details: { course_code, lecturer_name } });
   res.status(201).json(data);
 });
 
-router.patch("/:id/end", async (req, res) => {
+router.patch("/:id/end", requireRole("operator"), async (req, res) => {
   const { id } = req.params;
 
   const { data, error } = await supabase
@@ -40,10 +43,11 @@ router.patch("/:id/end", async (req, res) => {
     return;
   }
 
+  await logAudit({ action: "end_session", resource: "session", resource_id: id, role: (req as any).role, ip: req.ip });
   res.json(data);
 });
 
-router.get("/", async (req, res) => {
+router.get("/", requireRole("viewer"), async (req, res) => {
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;
   const from = (page - 1) * limit;
@@ -71,7 +75,7 @@ router.get("/", async (req, res) => {
   });
 });
 
-router.get("/:id", async (req, res) => {
+router.get("/:id", requireRole("viewer"), async (req, res) => {
   const { id } = req.params;
 
   const { data, error } = await supabase

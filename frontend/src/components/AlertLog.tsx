@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { AlertRecord } from '../types';
+import { getAuthHeader } from '../context/AuthContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
@@ -33,7 +34,7 @@ export default function AlertLog({ roomId, sessionId }: AlertLogProps) {
       const params = new URLSearchParams({ dismissed: 'false', limit: '30' });
       if (roomId) params.set('room_id', roomId);
       if (sessionId) params.set('session_id', sessionId);
-      const res = await fetch(`${API_URL}/alerts?${params}`);
+      const res = await fetch(`${API_URL}/alerts?${params}`, { headers: getAuthHeader() });
       if (res.ok) {
         const data: AlertRecord[] = await res.json();
         setAlerts(data);
@@ -68,14 +69,14 @@ export default function AlertLog({ roomId, sessionId }: AlertLogProps) {
 
   const dismiss = async (id: string) => {
     setAlerts(prev => prev.filter(a => a.id !== id));
-    await fetch(`${API_URL}/alerts/${id}/dismiss`, { method: 'PATCH' });
+    await fetch(`${API_URL}/alerts/${id}/dismiss`, { method: 'PATCH', headers: getAuthHeader() });
   };
 
   const dismissAll = async () => {
     setAlerts([]);
     await fetch(`${API_URL}/alerts/dismiss-all`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
       body: JSON.stringify({ room_id: roomId }),
     });
   };

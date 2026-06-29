@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { AnalysisUpdate, DetectedFace, DetectedPerson } from '../types';
+import { getAuthHeader } from '../context/AuthContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 const ANALYSIS_INTERVAL_MS = 15000;
 
-type SourceType = 'webcam' | 'youtube' | 'rtsp';
-interface Source { type: SourceType; url?: string }
+type SourceType = 'webcam' | 'youtube' | 'rtsp' | 'upload';
+interface Source { type: SourceType; url?: string; fileName?: string }
 
 interface LiveData {
   engagement: number;
@@ -137,6 +138,8 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
   const intervalRef     = useRef<ReturnType<typeof setInterval> | null>(null);
   const sseRef          = useRef<EventSource | null>(null);
   const animFrameRef    = useRef<number>(0);
+  const fileInputRef    = useRef<HTMLInputElement>(null);
+  const uploadObjRef    = useRef<string | null>(null); // object URL for cleanup
 
   // Redraw overlay on detection change
   const redrawOverlay = useCallback(() => {
@@ -236,7 +239,7 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
     // Tell backend to start polling
     try {
       await fetch(`${API_URL}/camera/start-polling`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
         body: JSON.stringify({ room_id: id, rtsp_url: rtspUrl, session_id: sessionId ?? null }),
       });
     } catch (err: any) {
@@ -296,27 +299,47 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
     sseRef.current = null;
     try {
       await fetch(`${API_URL}/camera/stop-polling`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
         body: JSON.stringify({ room_id: id }),
       });
     } catch {}
     setRtspThumbnail(null);
   }, [id]);
 
+  // ── Video file upload ────────────────────────────────────────────────────────
+  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (uploadObjRef.current) URL.revokeObjectURL(uploadObjRef.current);
+    const objUrl = URL.createObjectURL(file);
+    uploadObjRef.current = objUrl;
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+      videoRef.current.src = objUrl;
+      videoRef.current.loop = true;
+      videoRef.current.play().catch(() => {});
+    }
+    setSource({ type: 'upload', fileName: file.name });
+    // Reset input so same file can be reloaded
+    e.target.value = '';
+  }, []);
+
   // ── Unified stop ──────────────────────────────────────────────────────────────
   const stopSource = useCallback(async () => {
     if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
     if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
     if (source?.type === 'rtsp') await stopRtspPolling();
+    if (videoRef.current) { videoRef.current.pause(); videoRef.current.srcObject = null; videoRef.current.src = ''; }
+    if (uploadObjRef.current) { URL.revokeObjectURL(uploadObjRef.current); uploadObjRef.current = null; }
     setSource(null);
     setDetection({ faces: [], persons: [], frameWidth: 0, frameHeight: 0 });
     setLiveData(d => ({ ...d, analysing: false }));
   }, [source, stopRtspPolling]);
 
-  // Webcam analysis loop
+  // Webcam / upload analysis loop — both use captureFrame from videoRef
   useEffect(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
-    if (source?.type === 'webcam') {
+    if (source?.type === 'webcam' || source?.type === 'upload') {
       runWebcamAnalysis();
       intervalRef.current = setInterval(runWebcamAnalysis, ANALYSIS_INTERVAL_MS);
     }
@@ -358,7 +381,7 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
         <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
           <div className={`flex items-center gap-2 px-3 py-1 ${source ? 'bg-red-600/90' : 'bg-gray-700/80'} backdrop-blur-sm rounded-md text-[10px] font-bold text-white uppercase tracking-wider border ${source ? 'border-red-500' : 'border-white/10'}`}>
             <div className={`w-1.5 h-1.5 rounded-full ${source ? 'bg-white animate-pulse' : 'bg-gray-400'}`}></div>
-            {source?.type === 'rtsp' ? 'SERVER-SIDE' : source ? (liveData.analysing ? 'ANALYSING' : 'LIVE') : 'IDLE'}
+            {source?.type === 'rtsp' ? 'SERVER-SIDE' : source?.type === 'upload' ? 'UPLOAD' : source ? (liveData.analysing ? 'ANALYSING' : 'LIVE') : 'IDLE'}
           </div>
           {source && (
             <button onClick={stopSource} className="px-2 py-1 bg-black/60 backdrop-blur-sm rounded-md text-[10px] text-gray-400 hover:text-red-400 border border-white/10 transition-colors uppercase tracking-wider">
@@ -411,6 +434,10 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" /></svg>
                 RTSP / IP Camera
               </button>
+              <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 rounded-xl text-purple-300 text-xs font-semibold transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                Upload Video
+              </button>
             </div>
           </div>
         )}
@@ -418,6 +445,16 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
         {/* Webcam */}
         {source?.type === 'webcam' && (
           <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+        )}
+
+        {/* Uploaded video */}
+        {source?.type === 'upload' && (
+          <div className="flex-1 relative">
+            <video ref={videoRef} autoPlay playsInline muted loop className="w-full h-full object-contain" />
+            <div className="absolute bottom-4 left-4 px-2 py-1 bg-black/70 rounded text-[9px] text-purple-300 font-mono truncate max-w-[60%]">
+              {source.fileName}
+            </div>
+          </div>
         )}
 
         {/* YouTube */}
@@ -459,7 +496,10 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
           </div>
         )}
 
-        {/* Hidden capture canvas (webcam only) */}
+        {/* Hidden file input for video upload */}
+        <input ref={fileInputRef} type="file" accept="video/*" className="hidden" onChange={handleFileUpload} />
+
+        {/* Hidden capture canvas (webcam + upload) */}
         <canvas ref={captureCanvasRef} className="hidden" />
 
         {/* Bounding box overlay */}
@@ -473,6 +513,8 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
           <div className="px-3 py-1.5 bg-[#0b1120]/90 backdrop-blur-md border border-white/10 rounded-md text-[9px] font-mono text-gray-400 uppercase truncate">
             {source?.type === 'rtsp'
               ? 'ENGINE: SERVER-SIDE DEEPFACE MTCNN + HOG + GEMINI'
+              : source?.type === 'upload'
+              ? 'ENGINE: VIDEO UPLOAD · GEMINI 2.0 FLASH + DEEPFACE MTCNN'
               : 'ENGINE: GEMINI 2.0 FLASH + DEEPFACE MTCNN + HOG'}
           </div>
           <div className={`px-3 py-1.5 bg-[#0b1120]/90 backdrop-blur-md border ${source ? 'border-amber-500/30' : 'border-white/10'} rounded-md text-[9px] font-mono ${source ? engColor : 'text-gray-500'} uppercase flex items-center gap-2 truncate`}>

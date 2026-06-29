@@ -3,6 +3,7 @@ import { supabase } from "../supabase_service";
 import { startPolling, stopPolling, getActivePollRooms, isPolling } from "../poll-manager";
 import { broadcastToRoom } from "./stream";
 import { GoogleGenAI } from "@google/genai";
+import { requireRole } from "../middleware/rbac";
 
 const router = Router();
 
@@ -149,7 +150,7 @@ async function pollRtspOnce(roomId: string, rtspUrl: string, sessionId: string |
 // ── Routes ─────────────────────────────────────────────────────────────────────
 
 // Register a room (existing)
-router.post("/register", async (req, res) => {
+router.post("/register", requireRole("admin"), async (req, res) => {
   const { name, location, expected_capacity, camera_url } = req.body;
   if (!name) { res.status(400).json({ error: "name is required" }); return; }
   const { data, error } = await supabase
@@ -159,14 +160,14 @@ router.post("/register", async (req, res) => {
 });
 
 // List rooms (existing)
-router.get("/list", async (req, res) => {
+router.get("/list", requireRole("viewer"), async (req, res) => {
   const { data, error } = await supabase.from("rooms").select("*").order("created_at", { ascending: false });
   if (error) { res.status(500).json({ error: error.message }); return; }
   res.json(data);
 });
 
 // Delete room (existing)
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireRole("admin"), async (req, res) => {
   const { id } = req.params;
   const { data, error } = await supabase.from("rooms").delete().eq("id", id).select().single();
   if (error) { res.status(error.code === "PGRST116" ? 404 : 500).json({ error: error.message }); return; }
@@ -174,7 +175,7 @@ router.delete("/:id", async (req, res) => {
 });
 
 // ── NEW: Start server-side RTSP polling ───────────────────────────────────────
-router.post("/start-polling", async (req, res) => {
+router.post("/start-polling", requireRole("operator"), async (req, res) => {
   const { room_id, rtsp_url, session_id } = req.body;
 
   if (!room_id || !rtsp_url) {
@@ -198,7 +199,7 @@ router.post("/start-polling", async (req, res) => {
 });
 
 // ── NEW: Stop server-side RTSP polling ────────────────────────────────────────
-router.post("/stop-polling", async (req, res) => {
+router.post("/stop-polling", requireRole("operator"), async (req, res) => {
   const { room_id } = req.body;
   if (!room_id) { res.status(400).json({ error: "room_id is required" }); return; }
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Session } from '../types';
+import { getAuthHeader } from '../context/AuthContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
@@ -45,7 +46,7 @@ export default function SessionPanel({ currentSession, roomId, onSessionStart, o
     try {
       const res = await fetch(`${API_URL}/sessions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
         body: JSON.stringify({
           room_id: roomId,
           lecturer_name: lecturerName.trim(),
@@ -71,7 +72,7 @@ export default function SessionPanel({ currentSession, roomId, onSessionStart, o
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_URL}/sessions/${currentSession.id}/end`, { method: 'PATCH' });
+      const res = await fetch(`${API_URL}/sessions/${currentSession.id}/end`, { method: 'PATCH', headers: getAuthHeader() });
       if (!res.ok) throw new Error(await res.text());
       onSessionEnd();
     } catch (err: any) {
@@ -84,7 +85,7 @@ export default function SessionPanel({ currentSession, roomId, onSessionStart, o
   const handleExport = async () => {
     if (!currentSession) return;
     try {
-      const res = await fetch(`${API_URL}/analytics/${currentSession.id}`);
+      const res = await fetch(`${API_URL}/analytics/${currentSession.id}`, { headers: getAuthHeader() });
       const data = await res.json();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);

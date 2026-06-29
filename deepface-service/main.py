@@ -1,3 +1,8 @@
+"""
+EduSphere AI — DeepFace Analysis Service
+PDPA-compliant: thumbnails returned to frontend have face regions blurred.
+Analysis frames sent to Gemini are unblurred (needed for accuracy).
+"""
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,8 +16,9 @@ from deepface import DeepFace
 import os
 from collections import Counter
 
-PING_INTERVAL = 14 * 60  # just under Render's 15-min spindown
+PING_INTERVAL = 14 * 60  # 14 min — just under Render's 15-min spindown
 
+# ── Keep-alive ──────────────────────────────────────────────────────────────────
 async def _keep_alive():
     self_url = os.getenv("RENDER_EXTERNAL_URL", "http://localhost:8000")
     await asyncio.sleep(60)
@@ -41,6 +47,7 @@ app.add_middleware(
 )
 
 API_KEY = os.getenv("DEEPFACE_API_KEY")
+PDPA_BLUR = os.getenv("PDPA_FACE_BLUR", "true").lower() != "false"  # default ON
 
 # ── HOG person detector (loaded once) ─────────────────────────────────────────
 _hog = cv2.HOGDescriptor()
@@ -49,8 +56,7 @@ _hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
 ATTENTIVE_EMOTIONS = {"happy", "neutral", "surprise"}
 
 
-# ── Schemas ───────────────────────────────────────────────────────────────────
-
+# ── Schemas ────────────────────────────────────────────────────────────────────
 class AnalysisRequest(BaseModel):
     image_b64: str
     session_id: str
@@ -62,13 +68,34 @@ class RtspRequest(BaseModel):
     room_id: str
 
 
-# ── Shared analysis logic ──────────────────────────────────────────────────────
+# ── PDPA: blur face regions in an image ────────────────────────────────────────
+def _blur_faces(frame: np.ndarray, faces: list[dict]) -> np.ndarray:
+    """Apply Gaussian blur over detected face regions for PDPA compliance."""
+    if not PDPA_BLUR or not faces:
+        return frame
+    blurred = frame.copy()
+    h, w = frame.shape[:2]
+    for face in faces:
+        box = face.get("box", {})
+        x, y, fw, fh = int(box.get("x", 0)), int(box.get("y", 0)), int(box.get("w", 0)), int(box.get("h", 0))
+        if fw < 10 or fh < 10:
+            continue
+        # Clamp to image bounds
+        x1, y1 = max(0, x - 10), max(0, y - 10)
+        x2, y2 = min(w, x + fw + 10), min(h, y + fh + 10)
+        roi = blurred[y1:y2, x1:x2]
+        if roi.size == 0:
+            continue
+        # Strong blur — ksize scales with face size
+        ksize = max(31, (fw // 4) * 2 + 1)
+        blurred[y1:y2, x1:x2] = cv2.GaussianBlur(roi, (ksize, ksize), 0)
+    return blurred
 
+
+# ── Core analysis ───────────────────────────────────────────────────────────────
 def _analyze_frame(frame: np.ndarray) -> dict:
-    """Run DeepFace + HOG on a numpy frame. Returns combined result dict."""
+    """Run DeepFace (MTCNN→opencv fallback) + HOG on a BGR numpy frame."""
     orig_h, orig_w = frame.shape[:2]
-
-    # Resize for DeepFace
     max_width = 640
     if orig_w > max_width:
         scale = max_width / orig_w
@@ -77,8 +104,9 @@ def _analyze_frame(frame: np.ndarray) -> dict:
         analysis_frame = frame
         scale = 1.0
 
-    # ── Face detection: mtcnn → opencv fallback ───────────────────────────────
+    # Face detection
     raw = None
+    used_backend = "none"
     for backend in ("mtcnn", "opencv"):
         try:
             raw = DeepFace.analyze(
@@ -88,6 +116,7 @@ def _analyze_frame(frame: np.ndarray) -> dict:
                 detector_backend=backend,
                 silent=True,
             )
+            used_backend = backend
             break
         except Exception:
             continue
@@ -96,10 +125,7 @@ def _analyze_frame(frame: np.ndarray) -> dict:
         return _degraded("DeepFace analysis failed on all backends")
 
     results = raw if isinstance(raw, list) else [raw]
-
-    faces = []
-    emotions = []
-    attention_scores = []
+    faces, emotions, attention_scores = [], [], []
 
     for face in results:
         dominant = face.get("dominant_emotion", "unknown")
@@ -116,22 +142,13 @@ def _analyze_frame(frame: np.ndarray) -> dict:
         }
         emotion_scores = face.get("emotion", {})
         confidence = round(float(max(emotion_scores.values())) / 100, 3) if emotion_scores else 0.5
+        faces.append({"box": box, "emotion": dominant, "attention": is_attentive, "confidence": confidence})
 
-        faces.append({
-            "box": box,
-            "emotion": dominant,
-            "attention": is_attentive,
-            "confidence": confidence,
-        })
-
-    # ── Person / body detection via HOG ───────────────────────────────────────
     persons = _detect_persons(frame)
 
-    # ── Aggregates ────────────────────────────────────────────────────────────
     total = len(results)
     attentive_count = sum(attention_scores)
     attention_rate = round((attentive_count / total) * 100) if total > 0 else 0
-
     emotion_counter = Counter(emotions)
     dominant_class_emotion = emotion_counter.most_common(1)[0][0] if emotion_counter else "unknown"
 
@@ -149,6 +166,7 @@ def _analyze_frame(frame: np.ndarray) -> dict:
         "persons": persons,
         "frame_width": orig_w,
         "frame_height": orig_h,
+        "detector_used": used_backend,
     }
 
 
@@ -160,10 +178,7 @@ def _detect_persons(frame: np.ndarray) -> list[dict]:
         return []
     return [
         {
-            "box": {
-                "x": int(x / scale), "y": int(y / scale),
-                "w": int(w / scale), "h": int(h / scale),
-            },
+            "box": {"x": int(x / scale), "y": int(y / scale), "w": int(w / scale), "h": int(h / scale)},
             "confidence": round(float(conf), 3),
         }
         for (x, y, w, h), conf in zip(rects, weights.flatten())
@@ -171,7 +186,6 @@ def _detect_persons(frame: np.ndarray) -> list[dict]:
 
 
 def _encode_frame(frame: np.ndarray, max_width: int = 640, quality: int = 75) -> str:
-    """Encode a numpy frame to base64 JPEG string."""
     h, w = frame.shape[:2]
     if w > max_width:
         frame = cv2.resize(frame, (max_width, int(h * max_width / w)))
@@ -189,28 +203,24 @@ def _degraded(msg: str) -> dict:
 
 
 def _capture_rtsp_frame(rtsp_url: str):
-    """Blocking: open RTSP stream, grab a current frame, release. Returns (frame, error)."""
+    """Blocking: open RTSP, grab a current frame, release. Returns (frame, error)."""
     cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
-
-    # Set aggressive timeouts so we don't block forever on bad URLs
     cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 8000)
     cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 5000)
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
     if not cap.isOpened():
         cap.release()
-        return None, "Could not connect to RTSP stream — check the URL and network"
+        return None, "Could not connect to RTSP stream — check URL and network"
 
-    # Skip a few buffered frames to get the most current one
     for _ in range(5):
-        cap.grab()
+        cap.grab()  # flush stale buffered frames
 
     ret, frame = cap.read()
     cap.release()
 
     if not ret or frame is None:
         return None, "Connected but could not read a frame from the stream"
-
     return frame, None
 
 
@@ -220,18 +230,13 @@ def _capture_rtsp_frame(rtsp_url: str):
 async def analyze(request: AnalysisRequest, x_api_key: str = Header(None)):
     if not API_KEY or x_api_key != API_KEY:
         raise HTTPException(status_code=403, detail="Invalid API Key")
-
     try:
         img_data = base64.b64decode(request.image_b64)
         nparr = np.frombuffer(img_data, np.uint8)
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-
         if frame is None:
             return _degraded("Could not decode image frame")
-
-        result = _analyze_frame(frame)
-        return result
-
+        return _analyze_frame(frame)
     except Exception as e:
         return _degraded(str(e))
 
@@ -239,14 +244,13 @@ async def analyze(request: AnalysisRequest, x_api_key: str = Header(None)):
 @app.post("/analyze/rtsp")
 async def analyze_rtsp(request: RtspRequest, x_api_key: str = Header(None)):
     """
-    Capture one frame from an RTSP/IP-camera stream server-side, run full
-    analysis, and return results + the captured frame as base64 (so the backend
-    can forward it to Gemini) plus a small thumbnail for the frontend preview.
+    Server-side RTSP frame capture + full analysis.
+    Returns DeepFace results + PDPA-compliant thumbnail (faces blurred)
+    + unblurred frame_b64 for Gemini (backend only, never sent to frontend).
     """
     if not API_KEY or x_api_key != API_KEY:
         raise HTTPException(status_code=403, detail="Invalid API Key")
 
-    # Run the blocking OpenCV capture in a thread-pool executor
     loop = asyncio.get_event_loop()
     frame, capture_error = await loop.run_in_executor(None, _capture_rtsp_frame, request.rtsp_url)
 
@@ -256,18 +260,24 @@ async def analyze_rtsp(request: RtspRequest, x_api_key: str = Header(None)):
         result["thumbnail_b64"] = None
         return result
 
-    # Run DeepFace + HOG analysis
     result = _analyze_frame(frame)
 
-    # Full-resolution JPEG for Gemini (backend will forward this)
+    # Unblurred frame for Gemini (stays on backend, not returned to browser)
     result["frame_b64"] = _encode_frame(frame, max_width=640, quality=75)
 
-    # Small thumbnail for frontend preview (320px wide, compressed)
-    result["thumbnail_b64"] = _encode_frame(frame, max_width=320, quality=55)
+    # PDPA-compliant thumbnail: blur faces before sending to frontend
+    blurred_frame = _blur_faces(frame, result.get("faces", []))
+    result["thumbnail_b64"] = _encode_frame(blurred_frame, max_width=320, quality=55)
 
     return result
 
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "edusphere-deepface", "model": "loaded"}
+    return {
+        "status": "ok",
+        "service": "edusphere-deepface",
+        "model": "loaded",
+        "pdpa_blur": PDPA_BLUR,
+        "detector_order": ["mtcnn", "opencv"],
+    }

@@ -1,10 +1,11 @@
 import { Router } from "express";
 import { supabase } from "../supabase_service";
+import { requireRole } from "../middleware/rbac";
 
 const router = Router();
 
 // GET /api/analytics/rooms/summary — current status of all rooms
-router.get("/rooms/summary", async (req, res) => {
+router.get("/rooms/summary", requireRole("viewer"), async (req, res) => {
   const { data: rooms, error: roomsError } = await supabase
     .from("rooms")
     .select("id, name, expected_capacity");
@@ -50,7 +51,7 @@ router.get("/rooms/summary", async (req, res) => {
 });
 
 // GET /api/analytics/trends — engagement trends last 7 days
-router.get("/trends", async (req, res) => {
+router.get("/trends", requireRole("viewer"), async (req, res) => {
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
   const { data, error } = await supabase
@@ -81,7 +82,7 @@ router.get("/trends", async (req, res) => {
 });
 
 // GET /api/analytics/:sessionId — full analytics for a session
-router.get("/:sessionId", async (req, res) => {
+router.get("/:sessionId", requireRole("viewer"), async (req, res) => {
   const { sessionId } = req.params;
 
   const [{ data: session, error: sessionError }, { data: snapshots, error: snapshotsError }] =

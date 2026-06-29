@@ -1,50 +1,78 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 
 const router = Router();
 
-// Store active SSE connections
-const clients = new Map<string, any[]>();
+// In-memory client registry — keyed by roomId
+const clients = new Map<string, Set<Response>>();
 
-router.get("/:roomId", (req, res) => {
+// SSE heartbeat interval — keeps connections alive through proxies
+const HEARTBEAT_MS = 30_000;
+
+router.get("/:roomId", (req: Request, res: Response) => {
   const { roomId } = req.params;
-  
+
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
-  
+  res.setHeader("X-Accel-Buffering", "no"); // disable Nginx buffering
+  res.flushHeaders();
+
   // Initial connection event
-  res.write(`data: ${JSON.stringify({ type: 'connected', roomId })}\n\n`);
-  
-  // Add client to the room's list
-  if (!clients.has(roomId)) {
-    clients.set(roomId, []);
-  }
-  const roomClients = clients.get(roomId)!;
-  roomClients.push(res);
-  
-  // Clean up on disconnect
-  req.on("close", () => {
-    const clientsForRoom = clients.get(roomId);
-    if (clientsForRoom) {
-      const index = clientsForRoom.indexOf(res);
-      if (index !== -1) {
-        clientsForRoom.splice(index, 1);
-      }
-      if (clientsForRoom.length === 0) {
-        clients.delete(roomId);
-      }
+  res.write(`data: ${JSON.stringify({ type: "connected", roomId })}\n\n`);
+
+  // Register client
+  if (!clients.has(roomId)) clients.set(roomId, new Set());
+  clients.get(roomId)!.add(res);
+
+  // Heartbeat so the browser doesn't close the connection
+  const heartbeat = setInterval(() => {
+    try { res.write(": heartbeat\n\n"); } catch { cleanup(); }
+  }, HEARTBEAT_MS);
+
+  function cleanup() {
+    clearInterval(heartbeat);
+    const roomSet = clients.get(roomId);
+    if (roomSet) {
+      roomSet.delete(res);
+      if (roomSet.size === 0) clients.delete(roomId);
     }
-  });
+  }
+
+  req.on("close", cleanup);
+  req.on("error", cleanup);
+  res.on("error", cleanup);
 });
 
-// Helper function to broadcast events to a specific room
-// Export this if needed from other parts of the application
-export const broadcastToRoom = (roomId: string, eventType: string, payload: any) => {
-  const roomClients = clients.get(roomId);
-  if (roomClients) {
-    const message = `event: ${eventType}\ndata: ${JSON.stringify(payload)}\n\n`;
-    roomClients.forEach(client => client.write(message));
+/**
+ * Broadcast a typed SSE event to all clients watching a room.
+ * Safely skips closed connections and cleans them up.
+ */
+export function broadcastToRoom(roomId: string, eventType: string, payload: unknown): void {
+  const roomSet = clients.get(roomId);
+  if (!roomSet || roomSet.size === 0) return;
+
+  const message = `event: ${eventType}\ndata: ${JSON.stringify(payload)}\n\n`;
+  const dead: Response[] = [];
+
+  for (const client of roomSet) {
+    try {
+      client.write(message);
+    } catch {
+      dead.push(client);
+    }
   }
-};
+
+  for (const d of dead) {
+    roomSet.delete(d);
+  }
+  if (roomSet.size === 0) clients.delete(roomId);
+}
+
+/** Returns the count of active SSE connections across all rooms. */
+export function getConnectionCount(): number {
+  let total = 0;
+  for (const set of clients.values()) total += set.size;
+  return total;
+}
 
 export default router;
