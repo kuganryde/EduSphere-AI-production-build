@@ -10,6 +10,7 @@ import asyncio
 import base64
 import logging
 import os
+import threading
 from collections import Counter
 from contextlib import asynccontextmanager
 from typing import Any
@@ -26,6 +27,13 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
 
 # Suppress OpenCV/FFmpeg H.264 decoder noise (co located POCs, mmco, missing ref)
 os.environ.setdefault("OPENCV_FFMPEG_LOGLEVEL", "quiet")
+
+# Force TCP transport for RTSP — prevents UDP packet loss, reduces latency
+# stimeout: socket timeout µs (5 s); max_delay: mux delay µs (0.3 s)
+os.environ.setdefault(
+    "OPENCV_FFMPEG_CAPTURE_OPTIONS",
+    "rtsp_transport;tcp|stimeout;5000000|max_delay;300000",
+)
 
 # ── Constants ───────────────────────────────────────────────────────────────────
 PING_INTERVAL = 14 * 60  # keep-alive: just under Render's 15-min spindown
@@ -295,26 +303,62 @@ def _encode_jpeg(frame: np.ndarray, max_width: int = 640, quality: int = 75) -> 
     return base64.b64encode(buf).decode("utf-8")
 
 
-def _capture_rtsp_frame(rtsp_url: str) -> tuple[np.ndarray | None, str | None]:
-    """Blocking RTSP frame grab. Returns (frame, error_msg)."""
-    cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
-    cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 8_000)
-    cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 5_000)
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+# Persistent RTSP connection cache — avoids 2-5s reconnect overhead every poll
+_cap_cache: dict[str, cv2.VideoCapture] = {}
+_cap_lock  = threading.Lock()
 
+
+def _open_rtsp_cap(rtsp_url: str) -> cv2.VideoCapture | None:
+    cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
+    cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 10_000)
+    cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC,   5_000)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     if not cap.isOpened():
         cap.release()
-        return None, "Could not connect to RTSP stream — check URL and network"
+        log.warning("RTSP open failed: %s", rtsp_url)
+        return None
+    log.info("RTSP connected (TCP): %s", rtsp_url)
+    return cap
 
-    for _ in range(5):          # flush stale buffered frames
-        cap.grab()
 
-    ret, frame = cap.read()
-    cap.release()
+def _capture_rtsp_frame(rtsp_url: str) -> tuple[np.ndarray | None, str | None]:
+    """Grab the latest frame using a persistent RTSP connection (TCP)."""
+    with _cap_lock:
+        cap = _cap_cache.get(rtsp_url)
 
-    if not ret or frame is None:
-        return None, "Connected but could not read a frame"
-    return frame, None
+        # Reconnect if connection dropped
+        if cap is not None and not cap.isOpened():
+            cap.release()
+            cap = None
+            del _cap_cache[rtsp_url]
+
+        if cap is None:
+            cap = _open_rtsp_cap(rtsp_url)
+            if cap is None:
+                return None, "Could not connect to RTSP stream — check URL and network"
+            _cap_cache[rtsp_url] = cap
+
+        # Flush stale buffered frames to always return the latest
+        for _ in range(8):
+            cap.grab()
+
+        ret, frame = cap.read()
+
+        if not ret or frame is None:
+            # Connection went stale mid-session — reconnect once
+            cap.release()
+            _cap_cache.pop(rtsp_url, None)
+            cap = _open_rtsp_cap(rtsp_url)
+            if cap is None:
+                return None, "RTSP reconnect failed — stream may have stopped"
+            _cap_cache[rtsp_url] = cap
+            for _ in range(3):
+                cap.grab()
+            ret, frame = cap.read()
+            if not ret or frame is None:
+                return None, "Connected but could not read a frame"
+
+        return frame, None
 
 
 # ── Routes ──────────────────────────────────────────────────────────────────────
@@ -378,10 +422,10 @@ async def analyze_rtsp(
     result = _analyze_frame(frame)
 
     # Unblurred frame → Gemini (backend only, never forwarded to browser)
-    result["frame_b64"] = _encode_jpeg(frame, max_width=640, quality=75)
+    result["frame_b64"] = _encode_jpeg(frame, max_width=640, quality=80)
 
     # PDPA-compliant thumbnail → frontend camera strip
     blurred = _blur_faces(frame, result.get("faces", []))
-    result["thumbnail_b64"] = _encode_jpeg(blurred, max_width=320, quality=55)
+    result["thumbnail_b64"] = _encode_jpeg(blurred, max_width=480, quality=70)
 
     return result

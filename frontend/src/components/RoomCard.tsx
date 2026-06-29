@@ -3,7 +3,8 @@ import { AnalysisUpdate, DetectedFace, DetectedPerson } from '../types';
 import { getAuthHeader } from '../context/AuthContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-const ANALYSIS_INTERVAL_MS = 15000;
+const WEBCAM_INTERVAL_MS  = 5_000;   // local capture — fast
+const UPLOAD_INTERVAL_MS  = 6_000;   // video file
 
 type SourceType = 'webcam' | 'youtube' | 'rtsp' | 'upload';
 interface Source { type: SourceType; url?: string; fileName?: string }
@@ -259,9 +260,20 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
   // ── Webcam ────────────────────────────────────────────────────────────────────
   const startWebcam = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width:     { ideal: 1280, min: 640 },
+          height:    { ideal: 720,  min: 480 },
+          frameRate: { ideal: 30,   min: 15  },
+          facingMode: 'user',
+        },
+        audio: false,
+      });
       streamRef.current = stream;
-      if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
       setSource({ type: 'webcam' });
       setShowModal(false);
     } catch (err: any) {
@@ -273,12 +285,12 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
     const video = videoRef.current;
     const canvas = captureCanvasRef.current;
     if (!video || !canvas || video.readyState < 2) return null;
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
     ctx.drawImage(video, 0, 0);
-    return canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+    return canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
   }, []);
 
   const runWebcamAnalysis = useCallback(async () => {
@@ -411,8 +423,11 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
   useEffect(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     if (source?.type === 'webcam' || source?.type === 'upload') {
-      runWebcamAnalysis();
-      intervalRef.current = setInterval(runWebcamAnalysis, ANALYSIS_INTERVAL_MS);
+      const intervalMs = source.type === 'webcam' ? WEBCAM_INTERVAL_MS : UPLOAD_INTERVAL_MS;
+      // Small delay on first run so the video element has time to render a frame
+      const firstRun = setTimeout(() => runWebcamAnalysis(), 800);
+      intervalRef.current = setInterval(runWebcamAnalysis, intervalMs);
+      return () => { clearTimeout(firstRun); if (intervalRef.current) clearInterval(intervalRef.current); };
     }
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [source, runWebcamAnalysis]);
@@ -546,7 +561,8 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
               <img
                 src={rtspThumbnail}
                 alt="Latest RTSP frame"
-                className="w-full h-full object-contain"
+                className="w-full h-full"
+                style={{ objectFit: 'cover', imageRendering: 'auto' }}
               />
             ) : (
               <div className="flex flex-col items-center gap-4 text-center p-6">
@@ -556,7 +572,7 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
                 <div>
                   <p className="text-green-400 font-mono text-xs tracking-widest uppercase mb-1">Server-Side RTSP Polling Active</p>
                   <p className="text-gray-600 font-mono text-[10px] break-all max-w-xs">{source.url}</p>
-                  <p className="text-gray-700 text-[10px] mt-2">Waiting for first frame — analysis every {ANALYSIS_INTERVAL_MS / 1000}s</p>
+                  <p className="text-gray-700 text-[10px] mt-2">Waiting for first frame — analysis every 8s</p>
                 </div>
               </div>
             )}
@@ -584,7 +600,7 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
           </div>
           <div className="overlay-bar">
             <div className={`w-1.5 h-1.5 shrink-0 rounded-full ${source ? engBg : 'bg-gray-600'}`} />
-            {source ? `Analysis Active · ${ANALYSIS_INTERVAL_MS / 1000}s interval` : 'Pipeline idle'}
+            {source ? `Analysis Active · ${source.type === 'webcam' ? WEBCAM_INTERVAL_MS : source.type === 'upload' ? UPLOAD_INTERVAL_MS : 8_000}ms interval` : 'Pipeline idle'}
             {liveData.latencyMs ? ` · ${liveData.latencyMs}ms` : ''}
           </div>
         </div>

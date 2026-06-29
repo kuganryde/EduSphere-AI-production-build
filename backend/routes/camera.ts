@@ -10,7 +10,7 @@ const router = Router();
 
 const DEEPFACE_API_URL = process.env.DEEPFACE_API_URL || "http://localhost:8000";
 const DEEPFACE_API_KEY = process.env.DEEPFACE_API_KEY || "";
-const POLL_INTERVAL_MS = 15_000;
+const POLL_INTERVAL_MS = 8_000;
 
 const ALERT_LEVEL: Record<string, number> = {
   high_distraction: 2, low_attendance: 2, lecturer_absent: 3,
