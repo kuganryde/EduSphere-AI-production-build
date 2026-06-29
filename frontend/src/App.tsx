@@ -1,6 +1,7 @@
 import { useState, lazy, Suspense } from 'react';
 import { AnalysisUpdate } from './types';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import LoginModal from './components/LoginModal';
 
 const Dashboard     = lazy(() => import('./components/Dashboard'));
@@ -17,12 +18,28 @@ const Spinner = () => (
   </div>
 );
 
+/* Sun icon */
+const SunIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+      d="M12 3v1m0 16v1m8.66-9h-1M4.34 12h-1m15.07-6.07-.71.71M5.64 18.36l-.71.71m12.73 0-.71-.71M5.64 5.64l-.71-.71M12 8a4 4 0 100 8 4 4 0 000-8z" />
+  </svg>
+);
+
+/* Moon icon */
+const MoonIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+      d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z" />
+  </svg>
+);
+
 const NAV_ITEMS: {
-  id: Page; label: string; sublabel?: string; perm?: string; hidden?: boolean;
+  id: Page; label: string; sublabel?: string; perm?: string;
   icon: React.ReactNode;
 }[] = [
   {
-    id: 'dashboard', label: 'Dashboard', sublabel: 'Real-time',
+    id: 'dashboard', label: 'Dashboard', sublabel: 'Live monitoring',
     icon: (
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
@@ -68,14 +85,15 @@ const NAV_ITEMS: {
   },
 ];
 
-const ROLE_CONFIG: Record<string, { label: string; dot: string }> = {
-  admin:    { label: 'Admin',    dot: 'bg-red-400' },
-  operator: { label: 'Operator', dot: 'bg-amber-400' },
-  viewer:   { label: 'Viewer',   dot: 'bg-blue-400' },
+const ROLE_CONFIG: Record<string, { label: string; dot: string; badge: string }> = {
+  admin:    { label: 'Administrator', dot: 'bg-red-400',   badge: 'text-red-300' },
+  operator: { label: 'Operator',      dot: 'bg-amber-400', badge: 'text-amber-300' },
+  viewer:   { label: 'Viewer',        dot: 'bg-blue-400',  badge: 'text-blue-300' },
 };
 
 function AppShell() {
   const { isAuthenticated, role, logout, can, openMode } = useAuth();
+  const { theme, toggle, isDark } = useTheme();
   const [page, setPage] = useState<Page>('dashboard');
   const [liveStats, setLiveStats] = useState<AnalysisUpdate | null>(null);
 
@@ -83,7 +101,7 @@ function AppShell() {
 
   if (page === 'operator') {
     return (
-      <div className="h-screen bg-[#0b1120] text-gray-200 font-sans overflow-hidden flex flex-col">
+      <div className="h-screen bg-[var(--surface-0)] text-[var(--text-0)] overflow-hidden flex flex-col transition-theme">
         <Suspense fallback={<Spinner />}>
           <OperatorMode onSwitch={() => setPage('dashboard')} liveStats={liveStats} capacity={34} />
         </Suspense>
@@ -94,30 +112,45 @@ function AppShell() {
   const roleMeta = ROLE_CONFIG[role ?? 'viewer'];
 
   return (
-    <div className="flex h-screen bg-[#0b1120] text-gray-200 overflow-hidden font-sans">
+    <div className="flex h-screen overflow-hidden transition-theme" style={{ background: 'var(--surface-0)', color: 'var(--text-0)' }}>
+
       {/* ── Sidebar ─────────────────────────────────────────────────────────────── */}
-      <nav className="w-[72px] lg:w-60 border-r border-white/5 bg-[#0e1526] flex flex-col shrink-0">
+      <nav
+        className="w-[68px] lg:w-[220px] flex flex-col shrink-0 transition-theme"
+        style={{ background: 'var(--surface-1)', borderRight: '1px solid var(--border-0)' }}
+      >
         {/* Logo */}
-        <div className="h-16 flex items-center px-4 lg:px-5 border-b border-white/5 shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-8 h-8 shrink-0 bg-blue-600 rounded-lg flex items-center justify-center shadow-md shadow-blue-900/50">
+        <div
+          className="h-[60px] flex items-center px-3 lg:px-4 shrink-0"
+          style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
+        >
+          <div className="flex items-center gap-3 min-w-0 w-full">
+            <div className="w-8 h-8 shrink-0 bg-blue-600 rounded-lg flex items-center justify-center shadow-md">
               <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                  d="M9.663 17h4.673M12 3v1m6.364 1.636-.707.707M21 12h-1M4 12H3m3.343-5.657-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
             </div>
-            <div className="hidden lg:block min-w-0">
-              <p className="text-sm font-bold text-white leading-tight">EduSphere</p>
-              <p className="text-[10px] text-blue-400 font-semibold uppercase tracking-widest leading-tight">Vision AI</p>
+            <div className="hidden lg:block min-w-0 flex-1">
+              <p className="text-[13px] font-bold text-white leading-tight">EduSphere</p>
+              <p className="text-[9px] text-blue-400 font-semibold uppercase tracking-widest">Vision AI</p>
             </div>
           </div>
         </div>
 
+        {/* Institute label */}
+        <div className="hidden lg:flex items-center gap-2 px-4 py-2.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+          <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-blue-400/70">University Platform</p>
+        </div>
+
         {/* Nav items */}
-        <div className="flex-1 py-3 px-2 lg:px-3 flex flex-col gap-0.5 overflow-y-auto">
-          <p className="hidden lg:block px-2 py-2 text-[9px] font-bold text-gray-600 uppercase tracking-[0.15em]">Navigation</p>
+        <div className="flex-1 py-2 px-2 flex flex-col gap-0.5 overflow-y-auto no-scrollbar">
+          <p className="hidden lg:block px-2 pt-2 pb-1 text-[8px] font-bold uppercase tracking-[0.16em]"
+             style={{ color: 'rgba(255,255,255,0.25)' }}>
+            Navigation
+          </p>
           {NAV_ITEMS.map(item => {
-            if (item.hidden) return null;
             if (item.perm && !can(item.perm)) return null;
             const active = page === item.id;
             return (
@@ -125,59 +158,93 @@ function AppShell() {
                 key={item.id}
                 onClick={() => setPage(item.id)}
                 title={item.label}
-                className={`group flex items-center gap-3 px-2 py-2.5 rounded-xl w-full text-left transition-all duration-150 ${
-                  active
-                    ? 'bg-blue-600/15 text-blue-400'
-                    : 'text-gray-500 hover:text-gray-200 hover:bg-white/5'
-                }`}
+                className="nav-item"
+                style={active ? {
+                  background: 'rgba(59,130,246,0.18)',
+                  color: '#93c5fd',
+                  borderColor: 'rgba(59,130,246,0.30)',
+                } : {}}
               >
-                <span className={`w-5 h-5 shrink-0 transition-colors ${active ? 'text-blue-400' : 'text-gray-500 group-hover:text-gray-300'}`}>
-                  {item.icon}
-                </span>
-                <div className="hidden lg:block min-w-0">
-                  <p className={`text-sm font-medium leading-tight truncate ${active ? 'text-blue-300' : ''}`}>{item.label}</p>
+                <span className="w-4 h-4 shrink-0">{item.icon}</span>
+                <div className="hidden lg:block min-w-0 flex-1">
+                  <p className="text-[12px] font-medium leading-tight truncate">{item.label}</p>
                   {item.sublabel && (
-                    <p className="text-[10px] text-gray-600 leading-tight truncate">{item.sublabel}</p>
+                    <p className="text-[9px] leading-tight truncate opacity-50">{item.sublabel}</p>
                   )}
                 </div>
-                {active && <div className="hidden lg:block ml-auto w-1 h-5 bg-blue-500 rounded-full shrink-0" />}
+                {active && <div className="hidden lg:block ml-auto w-0.5 h-4 bg-blue-400 rounded-full shrink-0" />}
               </button>
             );
           })}
         </div>
 
-        {/* Footer: role + logout */}
-        <div className="border-t border-white/5 p-2 lg:p-3 shrink-0">
+        {/* Footer */}
+        <div className="shrink-0 px-2 pb-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          {/* Theme toggle */}
+          <div className="flex items-center justify-center lg:justify-between px-1 pt-3 pb-2">
+            <span className="hidden lg:block text-[9px] uppercase tracking-widest font-semibold"
+                  style={{ color: 'rgba(255,255,255,0.25)' }}>
+              {isDark ? 'Night Mode' : 'Day Mode'}
+            </span>
+            <button
+              onClick={toggle}
+              title={isDark ? 'Switch to Day Mode' : 'Switch to Night Mode'}
+              className="theme-toggle"
+              aria-label="Toggle theme"
+            >
+              {isDark ? <SunIcon /> : <MoonIcon />}
+            </button>
+          </div>
+
+          {/* Role badge */}
           {!openMode && (
-            <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl mb-1">
+            <div className="flex items-center gap-2 px-2 py-2 rounded-xl mb-1"
+                 style={{ background: 'rgba(255,255,255,0.04)' }}>
               <div className="relative shrink-0">
-                <div className="w-7 h-7 rounded-lg bg-[#1a2540] border border-white/10 flex items-center justify-center">
-                  <span className="text-xs font-bold text-gray-300 uppercase">{role?.[0] ?? '?'}</span>
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                     style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                  <span className="text-[11px] font-bold text-white uppercase">{role?.[0] ?? '?'}</span>
                 </div>
-                <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#0e1526] ${roleMeta?.dot ?? 'bg-gray-500'}`} />
+                <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 ${roleMeta?.dot ?? 'bg-gray-500'}`}
+                     style={{ borderColor: 'var(--surface-1)' }} />
               </div>
               <div className="hidden lg:block min-w-0 flex-1">
-                <p className="text-xs font-semibold text-gray-300 leading-tight">{roleMeta?.label ?? role}</p>
-                <p className="text-[10px] text-gray-600 leading-tight truncate">Access level</p>
+                <p className={`text-[11px] font-semibold leading-tight ${roleMeta?.badge ?? 'text-gray-300'}`}>
+                  {roleMeta?.label ?? role}
+                </p>
+                <p className="text-[9px] leading-tight" style={{ color: 'rgba(255,255,255,0.30)' }}>
+                  {theme === 'dark' ? 'Night' : 'Day'} Mode
+                </p>
               </div>
             </div>
           )}
+
+          {/* Sign out */}
           <button
             onClick={logout}
             title="Sign out"
-            className="flex items-center justify-center lg:justify-start gap-2.5 w-full px-2 py-2 rounded-xl text-gray-600 hover:text-red-400 hover:bg-red-900/10 transition-colors"
+            className="flex items-center justify-center lg:justify-start gap-2 w-full px-2 py-2 rounded-xl transition-colors"
+            style={{ color: 'rgba(255,255,255,0.30)' }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLElement).style.color = '#f87171';
+              (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.10)';
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.30)';
+              (e.currentTarget as HTMLElement).style.background = 'transparent';
+            }}
           >
-            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
-            <span className="hidden lg:block text-xs font-medium">Sign Out</span>
+            <span className="hidden lg:block text-[11px] font-medium">Sign Out</span>
           </button>
         </div>
       </nav>
 
-      {/* ── Content ──────────────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-auto min-w-0">
+      {/* ── Main Content ──────────────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-auto min-w-0 transition-theme" style={{ background: 'var(--surface-0)' }}>
         <Suspense fallback={
           <div className="flex items-center justify-center h-full">
             <Spinner />
@@ -195,8 +262,10 @@ function AppShell() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppShell />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppShell />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
