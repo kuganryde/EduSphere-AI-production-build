@@ -38,6 +38,7 @@ app.use(helmet({
 // ── CORS — allow Netlify frontend and configurable additional origins ────────────
 const allowedOrigins = [
   process.env.FRONTEND_URL,
+  process.env.FRONTEND_URL_VERCEL,
   "https://eduspherevision.netlify.app",
   "https://eduspheredetection.netlify.app",
   "http://localhost:5173",
