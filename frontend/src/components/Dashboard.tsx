@@ -1,12 +1,15 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import RoomCard from './RoomCard';
+import MockFeedPanel from './MockFeedPanel';
 import AlertLog from './AlertLog';
 import EngagementChart from './EngagementChart';
 import GestureBreakdown from './GestureBreakdown';
 import SessionPanel from './SessionPanel';
 import LiveEmotionPanel from './LiveEmotionPanel';
 import EmotionTimelineChart from './EmotionTimelineChart';
-import { Session, AnalysisUpdate, PedagogicalAnalysis, EmotionTimelinePoint } from '../types';
+import { Session, AnalysisUpdate, AlertRecord, PedagogicalAnalysis, EmotionTimelinePoint } from '../types';
+import { useDemoMode } from '../context/DemoContext';
+import { useMockStream, buildMockAlert, buildMockSession } from '../demo/mockStream';
 
 type SlotType = 'webcam' | 'rtsp' | 'upload';
 
@@ -111,6 +114,40 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
   const [newCamLabel, setNewCamLabel]   = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const { isDemoMode } = useDemoMode();
+
+  // ── Demo mode state ──────────────────────────────────────────
+  const [mockSession, setMockSession]   = useState<Session | null>(null);
+  const [demoAlerts, setDemoAlerts]     = useState<AlertRecord[]>([]);
+  const prevDemoAlert                   = useRef<string | null>(null);
+
+  // Auto-start mock session when demo mode activates
+  useEffect(() => {
+    if (isDemoMode) {
+      setMockSession(buildMockSession());
+    } else {
+      setMockSession(null);
+      setDemoAlerts([]);
+      prevDemoAlert.current = null;
+    }
+  }, [isDemoMode]);
+
+  // Wire mock stream → same handleStatsUpdate pipeline
+  useMockStream(isDemoMode, (tick) => {
+    handleStatsUpdate(tick.update);
+    const alertType = tick.update.alert;
+    if (alertType && alertType !== prevDemoAlert.current) {
+      prevDemoAlert.current = alertType;
+      const sessionId = mockSession?.id ?? 'demo-session-001';
+      setDemoAlerts(prev => [
+        buildMockAlert(alertType, ROOM_ID, sessionId),
+        ...prev.slice(0, 9),
+      ]);
+    } else if (!alertType) {
+      prevDemoAlert.current = null;
+    }
+  });
+
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [stats, setStats] = useState<Omit<AnalysisUpdate, 'timestamp'>>({
     engagement: 0, headcount: 0, sentiment: '—', lecturerPresent: false,
@@ -205,7 +242,11 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
     setSlots(prev => prev.filter(s => s.key !== key));
   };
 
-  const sessionDuration = currentSession ? formatElapsed(currentSession.started_at) : undefined;
+  // Active session: demo session takes precedence when in demo mode
+  const activeSession  = isDemoMode ? mockSession : currentSession;
+  const sessionDuration = activeSession ? formatElapsed(activeSession.started_at) : undefined;
+  const isLive         = isDemoMode || !!activeSlotKey;
+
   const engColor = stats.engagement > 79 ? 'var(--success)' : stats.engagement > 49 ? 'var(--warning)' : stats.engagement > 0 ? 'var(--danger)' : 'var(--text-3)';
   const insights = buildInsights(stats);
 
@@ -294,6 +335,26 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
   return (
     <div className="flex flex-col min-h-full w-full transition-theme" style={{ background: 'var(--surface-0)' }}>
 
+      {/* ── Demo banner ──────────────────────────────────────── */}
+      {isDemoMode && (
+        <div
+          className="px-5 py-2 flex items-center gap-3 shrink-0"
+          style={{ background: 'rgba(245,158,11,0.08)', borderBottom: '1px solid rgba(245,158,11,0.25)' }}
+        >
+          <span className="w-1.5 h-1.5 rounded-full live-dot" style={{ background: '#f59e0b' }} />
+          <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#fbbf24' }}>
+            Demo Mode Active — Simulated Data
+          </span>
+          <span className="hidden md:inline text-[9px]" style={{ color: 'rgba(251,191,36,0.55)' }}>
+            All data is synthetic · No real cameras or API calls
+          </span>
+          <span className="ml-auto text-[9px] font-mono px-2 py-0.5 rounded-md"
+                style={{ background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.30)', color: '#fbbf24' }}>
+            CS302 · Dr. Sarah Chen
+          </span>
+        </div>
+      )}
+
       {/* ── Session info bar ─────────────────────────────────── */}
       <div
         className="px-5 py-2.5 shrink-0 flex items-center justify-between gap-3"
@@ -303,12 +364,16 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
           <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-2)' }}>
             Room 402-B
           </span>
-          {activeSlotKey && (
+          {isLive && (
             <>
               <div className="w-px h-3" style={{ background: 'var(--border-1)' }} />
               <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full live-dot" style={{ background: 'var(--success)' }} />
-                <span className="text-[10px] font-semibold" style={{ color: 'var(--success)' }}>LIVE</span>
+                <span className="w-1.5 h-1.5 rounded-full live-dot"
+                      style={{ background: isDemoMode ? '#f59e0b' : 'var(--success)' }} />
+                <span className="text-[10px] font-semibold"
+                      style={{ color: isDemoMode ? '#fbbf24' : 'var(--success)' }}>
+                  {isDemoMode ? 'DEMO' : 'LIVE'}
+                </span>
               </div>
               {sessionDuration && (
                 <>
@@ -334,7 +399,7 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
                 style={{ background: 'var(--surface-2)', color: 'var(--text-3)', border: '1px solid var(--border-0)' }}>
             Gemini 2.0 · HSEmotion · YOLOv11
           </span>
-          {activeSlotKey && (
+          {!isDemoMode && activeSlotKey && (
             <button
               onClick={stopActive}
               className="px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all"
@@ -348,8 +413,8 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
         </div>
       </div>
 
-      {/* ── Camera Source Strip ──────────────────────────────── */}
-      <div className="px-5 pt-4 pb-0 shrink-0">
+      {/* ── Camera Source Strip (hidden in demo mode) ───────── */}
+      <div className={`px-5 pt-4 pb-0 shrink-0 ${isDemoMode ? 'hidden' : ''}`}>
         <div className="flex items-center gap-3 overflow-x-auto pb-3 no-scrollbar">
           {slots.map(slot => {
             const style   = SLOT_STYLE[slot.type];
@@ -529,18 +594,27 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
         {/* Row 1: video + right analytics */}
         <div className="flex flex-col xl:flex-row gap-4" style={{ minHeight: 420 }}>
 
-          {/* Video feed */}
+          {/* Video feed — real or demo */}
           <div className="flex-1 min-w-0">
-            <RoomCard
-              name="Room 402-B / Main Stage"
-              capacity={ROOM_CAPACITY}
-              roomId={ROOM_ID}
-              sessionId={currentSession?.id}
-              onStatsUpdate={handleStatsUpdate}
-              triggerSource={trigger}
-              onRtspThumbnail={handleRtspThumbnail}
-              externalFileInput={fileInputRef}
-            />
+            {isDemoMode ? (
+              <MockFeedPanel
+                faceEmotions={liveEmotionData.faceEmotions}
+                headcount={stats.headcount}
+                engagement={stats.engagement}
+                isRunning={isDemoMode}
+              />
+            ) : (
+              <RoomCard
+                name="Room 402-B / Main Stage"
+                capacity={ROOM_CAPACITY}
+                roomId={ROOM_ID}
+                sessionId={currentSession?.id}
+                onStatsUpdate={handleStatsUpdate}
+                triggerSource={trigger}
+                onRtspThumbnail={handleRtspThumbnail}
+                externalFileInput={fileInputRef}
+              />
+            )}
           </div>
 
           {/* Right analytics column */}
@@ -552,17 +626,18 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
                 dominantEmotion={liveEmotionData.dominantEmotion}
                 pedagogicalNote={liveEmotionData.pedagogicalNote}
                 faceEmotions={liveEmotionData.faceEmotions}
-                isLive={!!activeSlotKey}
+                isLive={isLive}
               />
             </div>
 
             {/* Session panel */}
             <div className="shrink-0">
               <SessionPanel
-                currentSession={currentSession}
+                currentSession={activeSession}
                 roomId={ROOM_ID}
-                onSessionStart={setCurrentSession}
-                onSessionEnd={() => setCurrentSession(null)}
+                onSessionStart={isDemoMode ? setMockSession : setCurrentSession}
+                onSessionEnd={isDemoMode ? () => setMockSession(buildMockSession()) : () => setCurrentSession(null)}
+                demoMode={isDemoMode}
               />
             </div>
           </div>
@@ -582,7 +657,14 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
         </div>
 
         {/* Alerts */}
-        <AlertLog roomId={ROOM_ID} sessionId={currentSession?.id} />
+        <AlertLog
+          roomId={ROOM_ID}
+          sessionId={activeSession?.id}
+          demoMode={isDemoMode}
+          demoAlerts={demoAlerts}
+          onDemoAlertDismiss={(id) => setDemoAlerts(prev => prev.filter(a => a.id !== id))}
+          onDemoAlertDismissAll={() => setDemoAlerts([])}
+        />
 
         {/* Footer system info */}
         <div

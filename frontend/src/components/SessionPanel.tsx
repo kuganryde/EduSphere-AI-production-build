@@ -9,6 +9,7 @@ interface SessionPanelProps {
   roomId: string;
   onSessionStart: (session: Session) => void;
   onSessionEnd: () => void;
+  demoMode?: boolean;
 }
 
 function formatElapsed(startedAt: string): string {
@@ -39,7 +40,7 @@ function Field({ label, value, placeholder, onChange, type = 'text' }: {
   );
 }
 
-export default function SessionPanel({ currentSession, roomId, onSessionStart, onSessionEnd }: SessionPanelProps) {
+export default function SessionPanel({ currentSession, roomId, onSessionStart, onSessionEnd, demoMode }: SessionPanelProps) {
   const [lecturerName, setLecturerName] = useState('');
   const [courseCode, setCourseCode] = useState('');
   const [capacity, setCapacity] = useState('');
@@ -62,6 +63,22 @@ export default function SessionPanel({ currentSession, roomId, onSessionStart, o
     }
     setLoading(true); setError(null);
     try {
+      if (demoMode) {
+        // Demo mode: create a local session without API call
+        const fakeSession: Session = {
+          id: `demo-session-${Date.now()}`,
+          room_id: roomId,
+          lecturer_name: lecturerName.trim(),
+          course_code: courseCode.trim(),
+          expected_capacity: capacity ? parseInt(capacity) : 34,
+          started_at: new Date().toISOString(),
+          ended_at: null,
+          status: 'active',
+        };
+        onSessionStart(fakeSession);
+        setLecturerName(''); setCourseCode(''); setCapacity('');
+        return;
+      }
       const res = await fetch(`${API_URL}/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
@@ -83,6 +100,9 @@ export default function SessionPanel({ currentSession, roomId, onSessionStart, o
     if (!currentSession) return;
     setLoading(true); setError(null);
     try {
+      if (demoMode) {
+        onSessionEnd(); return;
+      }
       const res = await fetch(`${API_URL}/sessions/${currentSession.id}/end`, {
         method: 'PATCH', headers: getAuthHeader(),
       });
@@ -95,6 +115,22 @@ export default function SessionPanel({ currentSession, roomId, onSessionStart, o
   const handleExport = async () => {
     if (!currentSession) return;
     try {
+      if (demoMode) {
+        const mockData = {
+          session: currentSession,
+          note: 'Demo export — synthetic data only',
+          snapshots: [],
+          generated_at: new Date().toISOString(),
+        };
+        const blob = new Blob([JSON.stringify(mockData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `demo-session-${currentSession.course_code}-${currentSession.started_at.slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        return;
+      }
       const res = await fetch(`${API_URL}/analytics/${currentSession.id}`, { headers: getAuthHeader() });
       const data = await res.json();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });

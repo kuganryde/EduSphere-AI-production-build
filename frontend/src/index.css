@@ -448,6 +448,10 @@ html.light .trust-badge {
   to   { opacity: 1; transform: translateX(0); }
 }
 .slide-right { animation: slide-right 0.3s ease forwards; }
+@keyframes scan-vertical {
+  0%   { top: -2px; }
+  100% { top: 100%; }
+}
 @keyframes score-glow {
   0%, 100% { filter: drop-shadow(0 0 12px var(--brand-glow)); }
   50%       { filter: drop-shadow(0 0 28px var(--brand-glow)); }

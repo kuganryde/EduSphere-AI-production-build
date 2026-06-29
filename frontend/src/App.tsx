@@ -2,6 +2,7 @@ import { useState, lazy, Suspense, useEffect } from 'react';
 import { AnalysisUpdate } from './types';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
+import { DemoProvider, useDemoMode } from './context/DemoContext';
 import LoginModal from './components/LoginModal';
 
 const Dashboard     = lazy(() => import('./components/Dashboard'));
@@ -109,6 +110,7 @@ function TopNav({
   openMode: boolean;
   onLogout: () => void;
 }) {
+  const { isDemoMode, setDemoMode } = useDemoMode();
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -213,6 +215,25 @@ function TopNav({
           {now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
         </span>
       </div>
+
+      {/* Demo / Real toggle */}
+      <button
+        onClick={() => setDemoMode(!isDemoMode)}
+        title={isDemoMode ? 'Switch to Real mode' : 'Switch to Demo mode'}
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all shrink-0"
+        style={{
+          background:  isDemoMode ? 'rgba(245,158,11,0.14)' : 'var(--surface-3)',
+          border:      `1px solid ${isDemoMode ? 'rgba(245,158,11,0.48)' : 'var(--border-1)'}`,
+          color:       isDemoMode ? '#fbbf24' : 'var(--text-3)',
+        }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.85'; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
+      >
+        {isDemoMode
+          ? <><span className="w-1.5 h-1.5 rounded-full live-dot" style={{ background: '#fbbf24' }} /><span className="text-[9px] font-bold uppercase tracking-wider">Demo</span></>
+          : <><span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--text-3)' }} /><span className="text-[9px] font-bold uppercase tracking-wider">Real</span></>
+        }
+      </button>
 
       {/* Divider */}
       <div className="w-px h-6 shrink-0 ml-1" style={{ background: 'var(--border-0)' }} />
@@ -414,7 +435,9 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <AppShell />
+        <DemoProvider>
+          <AppShell />
+        </DemoProvider>
       </AuthProvider>
     </ThemeProvider>
   );
