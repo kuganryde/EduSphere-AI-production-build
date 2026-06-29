@@ -119,8 +119,26 @@ export interface AnalysisUpdate {
   alert: string | null;
   attentionRate: number | null;
   timestamp: string;
+  emotionBreakdown: Record<string, number> | null;
+  dominantEmotion: string | null;
+  pedagogicalNote: string | null;
+  faceEmotions: Array<{ emotion: string; attention: boolean; confidence: number }>;
 }
 
 export type SentimentType = 'focused' | 'distracted' | 'tired' | 'energetic' | 'mixed';
 export type AlertLevel = 1 | 2 | 3;
 export type ClassState = 'IDLE' | 'ACTIVE' | 'ALERT';
+
+export interface EmotionTimelinePoint {
+  time: string;
+  angry: number;
+  disgust: number;
+  fear: number;
+  happy: number;
+  sad: number;
+  surprise: number;
+  neutral: number;
+  engagement: number;
+  attention: number;
+  sentiment: string;
+}

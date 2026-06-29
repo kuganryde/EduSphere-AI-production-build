@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  CartesianGrid, BarChart, Bar,
+  CartesianGrid, BarChart, Bar, Cell,
 } from 'recharts';
 import { getAuthHeader } from '../context/AuthContext';
 
@@ -12,6 +12,20 @@ interface RoomSummary {
   roomId: string; name: string; status: string;
   engagement: number; headcount: number; capacity: number;
 }
+
+/** Canonical emotion colors — consistent across all components */
+const EMOTION_COLORS: Record<string, string> = {
+  happy:    '#10b981',
+  neutral:  '#3b82f6',
+  surprise: '#8b5cf6',
+  sad:      '#f59e0b',
+  angry:    '#ef4444',
+  fear:     '#ec4899',
+  disgust:  '#f97316',
+};
+
+/** Ordered emotion keys for consistent display */
+const EMOTION_ORDER = ['happy', 'neutral', 'surprise', 'sad', 'angry', 'fear', 'disgust'];
 
 const ChartTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
@@ -43,6 +57,9 @@ export default function AnalyticsPage() {
   const [trends, setTrends]   = useState<TrendDay[]>([]);
   const [rooms, setRooms]     = useState<RoomSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  // Latest session emotion breakdown
+  const [emotionBreakdown, setEmotionBreakdown] = useState<Record<string, number> | null>(null);
+  const [emotionSessionLabel, setEmotionSessionLabel] = useState<string | null>(null);
 
   useEffect(() => {
     const h = getAuthHeader();
@@ -53,6 +70,25 @@ export default function AnalyticsPage() {
       setTrends(t.days ?? []);
       setRooms(Array.isArray(r) ? r : []);
     }).catch(console.error).finally(() => setLoading(false));
+
+    // Fetch most recent session and its emotion breakdown
+    fetch(`${API_URL}/sessions?limit=1`, { headers: h })
+      .then(r => r.ok ? r.json() : [])
+      .then((sessions: any[]) => {
+        const latest = Array.isArray(sessions) ? sessions[0] : null;
+        if (!latest?.id) return;
+        const label = latest.course_code
+          ? `${latest.course_code} — ${new Date(latest.started_at).toLocaleDateString()}`
+          : new Date(latest.started_at).toLocaleDateString();
+        setEmotionSessionLabel(label);
+        return fetch(`${API_URL}/analytics/${latest.id}`, { headers: h }).then(r => r.json());
+      })
+      .then((analytics: any) => {
+        if (analytics?.avgEmotionBreakdown && Object.keys(analytics.avgEmotionBreakdown).length > 0) {
+          setEmotionBreakdown(analytics.avgEmotionBreakdown);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const avgEngagement = trends.length
@@ -242,6 +278,95 @@ export default function AnalyticsPage() {
                 </div>
               </div>
             )}
+
+            {/* Session Emotion Breakdown */}
+            <div
+              className="rounded-2xl p-5 transition-theme"
+              style={{ background: 'var(--surface-2)', border: '1px solid var(--border-0)', boxShadow: 'var(--shadow-sm)' }}
+            >
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h2 className="text-sm font-semibold" style={{ color: 'var(--text-0)' }}>
+                    Session Emotion Breakdown
+                  </h2>
+                  <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-2)' }}>
+                    {emotionSessionLabel
+                      ? `Average emotion distribution — ${emotionSessionLabel}`
+                      : 'Average emotion distribution from the most recent session'}
+                  </p>
+                </div>
+                {emotionBreakdown && (
+                  <span
+                    className="px-2.5 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider"
+                    style={{ background: 'var(--success-dim)', color: 'var(--success)', border: '1px solid rgba(16,185,129,0.20)' }}
+                  >
+                    Latest Session
+                  </span>
+                )}
+              </div>
+
+              {!emotionBreakdown ? (
+                <div className="h-40 flex flex-col items-center justify-center gap-3 text-center">
+                  <svg className="w-9 h-9" style={{ color: 'var(--text-3)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                      d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-xs" style={{ color: 'var(--text-3)' }}>
+                    No emotion data yet — complete a session with DeepFace analysis enabled
+                  </p>
+                </div>
+              ) : (
+                <div className="h-44">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      layout="vertical"
+                      data={EMOTION_ORDER
+                        .filter(e => (emotionBreakdown[e] ?? 0) > 0 || true)
+                        .map(e => ({ emotion: e, value: emotionBreakdown[e] ?? 0 }))}
+                      margin={{ top: 2, right: 12, left: 52, bottom: 2 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border-0)" horizontal={false} />
+                      <XAxis
+                        type="number"
+                        domain={[0, 100]}
+                        stroke="var(--border-1)"
+                        fontSize={9}
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fill: 'var(--text-2)' }}
+                        tickFormatter={(v: number) => `${v}%`}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="emotion"
+                        stroke="var(--border-1)"
+                        fontSize={10}
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fill: 'var(--text-1)', fontWeight: 600, textTransform: 'capitalize' }}
+                        width={50}
+                      />
+                      <Tooltip
+                        formatter={(value: number) => [`${value}%`, 'Avg %']}
+                        contentStyle={{
+                          background: 'var(--surface-2)',
+                          border: '1px solid var(--border-1)',
+                          borderRadius: 10,
+                          fontSize: 11,
+                          color: 'var(--text-0)',
+                        }}
+                        cursor={{ fill: 'var(--border-0)', opacity: 0.5 }}
+                      />
+                      <Bar dataKey="value" radius={[0, 6, 6, 0]} maxBarSize={22}>
+                        {EMOTION_ORDER.map(e => (
+                          <Cell key={e} fill={EMOTION_COLORS[e] ?? '#64748b'} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
 
             {/* Room status table */}
             <div

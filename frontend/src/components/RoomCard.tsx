@@ -215,16 +215,46 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
     }
 
     onStatsUpdate?.({
-      engagement:     updated.engagement,
-      headcount:      updated.headcount,
-      sentiment:      updated.sentiment,
-      lecturerPresent:updated.lecturerPresent,
-      gestures:       g?.gestures ?? null,
-      alert:          g?.alert ?? null,
-      attentionRate:  updated.attentionRate,
-      timestamp:      new Date().toISOString(),
+      engagement:       updated.engagement,
+      headcount:        updated.headcount,
+      sentiment:        updated.sentiment,
+      lecturerPresent:  updated.lecturerPresent,
+      gestures:         g?.gestures ?? null,
+      alert:            g?.alert ?? null,
+      attentionRate:    updated.attentionRate,
+      timestamp:        new Date().toISOString(),
+      emotionBreakdown: d && !d.degraded ? (d.aggregate?.emotion_breakdown ?? null) : null,
+      dominantEmotion:  d && !d.degraded ? (d.aggregate?.dominant_class_emotion ?? null) : null,
+      pedagogicalNote:  g?.pedagogical_note ?? null,
+      faceEmotions:     d && !d.degraded && Array.isArray(d.faces)
+        ? d.faces.map((f: any) => ({ emotion: f.emotion, attention: f.attention, confidence: f.confidence }))
+        : [],
     });
-  }, [onStatsUpdate]);
+
+    // Save complete snapshot to backend when a session is active
+    if (sessionId && id) {
+      const body = {
+        session_id:       sessionId,
+        room_id:          id,
+        engagement_score: updated.engagement,
+        headcount:        updated.headcount,
+        lecturer_present: updated.lecturerPresent,
+        classroom_sentiment: updated.sentiment,
+        gestures:         g?.gestures ?? null,
+        alert_level:      g?.alert ? (g.alert === 'lecturer_absent' ? 3 : 2) : null,
+        alert_type:       g?.alert ?? null,
+        attention_rate:   updated.attentionRate,
+        dominant_emotion: d && !d.degraded ? (d.aggregate?.dominant_class_emotion ?? null) : null,
+        emotion_breakdown: d && !d.degraded ? (d.aggregate?.emotion_breakdown ?? null) : null,
+        pedagogical_note: g?.pedagogical_note ?? null,
+      };
+      fetch(`${API_URL}/analytics/snapshot`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+        body: JSON.stringify(body),
+      }).catch(() => {}); // fire-and-forget
+    }
+  }, [onStatsUpdate, sessionId, id]);
 
   // ── Webcam ────────────────────────────────────────────────────────────────────
   const startWebcam = useCallback(async () => {

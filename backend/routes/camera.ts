@@ -126,6 +126,10 @@ async function pollRtspOnce(roomId: string, rtspUrl: string, sessionId: string |
       classroom_sentiment: analysisEvent.classroom_sentiment,
       gestures: analysisEvent.gestures,
       alert_level: analysisEvent.alert ? (ALERT_LEVEL[analysisEvent.alert] ?? 1) : null,
+      attention_rate: dfResult.aggregate?.attention_rate ?? null,
+      dominant_emotion: dfResult.aggregate?.dominant_class_emotion ?? null,
+      emotion_breakdown: dfResult.aggregate?.emotion_breakdown ?? null,
+      pedagogical_note: geminiResult?.pedagogical_note ?? null,
       source: "rtsp",
     }).then(({ error }) => {
       if (error) console.error("[RTSP poll] snapshot save:", error.message);

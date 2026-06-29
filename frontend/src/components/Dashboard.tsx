@@ -4,7 +4,9 @@ import AlertLog from './AlertLog';
 import EngagementChart from './EngagementChart';
 import GestureBreakdown from './GestureBreakdown';
 import SessionPanel from './SessionPanel';
-import { Session, AnalysisUpdate, PedagogicalAnalysis } from '../types';
+import LiveEmotionPanel from './LiveEmotionPanel';
+import EmotionTimelineChart from './EmotionTimelineChart';
+import { Session, AnalysisUpdate, PedagogicalAnalysis, EmotionTimelinePoint } from '../types';
 
 /* ── Types ─────────────────────────────────────────────────────── */
 type SlotType = 'webcam' | 'rtsp' | 'upload';
@@ -103,9 +105,17 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
   const [stats, setStats] = useState<Omit<AnalysisUpdate, 'timestamp'>>({
     engagement: 0, headcount: 0, sentiment: '—', lecturerPresent: false,
     gestures: null, alert: null, attentionRate: null,
+    emotionBreakdown: null, dominantEmotion: null, pedagogicalNote: null, faceEmotions: [],
   });
   const [engHistory, setEngHistory] = useState<{ time: string; focus: number; attention: number }[]>([]);
   const [lastGestures, setLastGestures] = useState<PedagogicalAnalysis['gestures'] | null>(null);
+  const [emotionHistory, setEmotionHistory] = useState<EmotionTimelinePoint[]>([]);
+  const [liveEmotionData, setLiveEmotionData] = useState<{
+    emotionBreakdown: Record<string, number> | null;
+    dominantEmotion: string | null;
+    pedagogicalNote: string | null;
+    faceEmotions: Array<{ emotion: string; attention: boolean; confidence: number }>;
+  }>({ emotionBreakdown: null, dominantEmotion: null, pedagogicalNote: null, faceEmotions: [] });
 
   /* When RoomCard streams a new RTSP thumbnail, store it in the slot */
   const handleRtspThumbnail = useCallback((thumbnail: string) => {
@@ -115,15 +125,51 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
 
   /* Stats update from RoomCard --------------------------------- */
   const handleStatsUpdate = useCallback((update: AnalysisUpdate) => {
-    setStats({ engagement: update.engagement, headcount: update.headcount, sentiment: update.sentiment,
+    setStats({
+      engagement: update.engagement, headcount: update.headcount, sentiment: update.sentiment,
       lecturerPresent: update.lecturerPresent, gestures: update.gestures, alert: update.alert,
-      attentionRate: update.attentionRate });
+      attentionRate: update.attentionRate,
+      emotionBreakdown: update.emotionBreakdown ?? null,
+      dominantEmotion: update.dominantEmotion ?? null,
+      pedagogicalNote: update.pedagogicalNote ?? null,
+      faceEmotions: update.faceEmotions ?? [],
+    });
     if (update.gestures) setLastGestures(update.gestures);
     const t = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     setEngHistory(prev => [
       ...prev.slice(-(MAX_HISTORY - 1)),
       { time: t, focus: update.engagement, attention: update.attentionRate ?? update.engagement },
     ]);
+
+    // Update live emotion panel data
+    setLiveEmotionData({
+      emotionBreakdown: update.emotionBreakdown ?? null,
+      dominantEmotion:  update.dominantEmotion ?? null,
+      pedagogicalNote:  update.pedagogicalNote ?? null,
+      faceEmotions:     update.faceEmotions ?? [],
+    });
+
+    // Append emotion timeline point when breakdown is available
+    if (update.emotionBreakdown) {
+      const eb = update.emotionBreakdown;
+      setEmotionHistory(prev => [
+        ...prev.slice(-(MAX_HISTORY - 1)),
+        {
+          time:       t,
+          angry:      eb.angry    ?? 0,
+          disgust:    eb.disgust   ?? 0,
+          fear:       eb.fear      ?? 0,
+          happy:      eb.happy     ?? 0,
+          sad:        eb.sad       ?? 0,
+          surprise:   eb.surprise  ?? 0,
+          neutral:    eb.neutral   ?? 0,
+          engagement: update.engagement,
+          attention:  update.attentionRate ?? update.engagement,
+          sentiment:  update.sentiment,
+        },
+      ]);
+    }
+
     onLiveStats?.(update);
   }, [onLiveStats]);
 
@@ -154,7 +200,13 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
     setActiveSlotKey(null);
     // Send explicit stop signal so RoomCard tears down its active stream
     setTrigger({ type: 'webcam', stop: true, nonce: Date.now() });
-    setStats({ engagement: 0, headcount: 0, sentiment: '—', lecturerPresent: false, gestures: null, alert: null, attentionRate: null });
+    setStats({
+      engagement: 0, headcount: 0, sentiment: '—', lecturerPresent: false,
+      gestures: null, alert: null, attentionRate: null,
+      emotionBreakdown: null, dominantEmotion: null, pedagogicalNote: null, faceEmotions: [],
+    });
+    setLiveEmotionData({ emotionBreakdown: null, dominantEmotion: null, pedagogicalNote: null, faceEmotions: [] });
+    setEmotionHistory([]);
   };
 
   /* URL modal confirm */
@@ -426,6 +478,15 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
               </p>
             </div>
 
+            {/* Live emotion panel */}
+            <LiveEmotionPanel
+              emotionBreakdown={liveEmotionData.emotionBreakdown}
+              dominantEmotion={liveEmotionData.dominantEmotion}
+              pedagogicalNote={liveEmotionData.pedagogicalNote}
+              faceEmotions={liveEmotionData.faceEmotions}
+              isLive={!!activeSlotKey}
+            />
+
             {/* Session panel */}
             <div className="flex-1 min-h-0">
               <SessionPanel
@@ -438,17 +499,20 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
           </div>
         </div>
 
-        {/* Row 2: charts + alert log */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {/* Row 2: emotion timeline + charts */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="xl:col-span-2">
+            <EmotionTimelineChart data={emotionHistory} />
+          </div>
           <div className="xl:col-span-1">
             <EngagementChart data={engHistory} sessionDuration={sessionDuration} />
           </div>
           <div className="xl:col-span-1">
             <GestureBreakdown gestures={lastGestures} />
           </div>
-          <div className="xl:col-span-1">
-            <AlertLog roomId={ROOM_ID} sessionId={currentSession?.id} />
-          </div>
+        </div>
+        <div className="mt-4">
+          <AlertLog roomId={ROOM_ID} sessionId={currentSession?.id} />
         </div>
 
       </div>

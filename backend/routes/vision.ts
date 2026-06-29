@@ -113,6 +113,7 @@ router.post("/", limiter, async (req, res) => {
           classroom_sentiment: resultData.classroom_sentiment,
           gestures: resultData.gestures,
           alert_level: resultData.alert ? (ALERT_LEVEL[resultData.alert] ?? 1) : null,
+          pedagogical_note: resultData.pedagogical_note ?? null,
           source: "gemini",
         })
         .then(({ error }) => {
