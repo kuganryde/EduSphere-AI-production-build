@@ -1,9 +1,12 @@
 streamlit>=1.35.0
-ultralytics>=8.2.0
+ultralytics>=8.3.0           # yolo11n-pose.pt + YOLO-World support
 opencv-python-headless>=4.9.0
-deepface>=0.0.93
+hsemotion-onnx>=0.3          # EfficientNet-B2 AffectNet-8 emotion engine (replaces deepface)
 yt-dlp>=2024.5.1
 numpy>=1.26.0
-tf-keras>=2.15.0
-python-vlc>=3.0.20301   # requires VLC media player installed on the OS
-# yolov8n-pose.pt is auto-downloaded by ultralytics on first run
+python-vlc>=3.0.20301        # requires VLC media player installed on the OS
+# deepface>=0.0.93           # removed — replaced by hsemotion-onnx
+# tf-keras>=2.15.0           # removed — no longer needed
+# Model weights downloaded automatically on first run:
+#   yolo11n-pose.pt   (pose estimation)
+#   yolov8s-worldv2.pt  (YOLO-World open-vocabulary detection)
