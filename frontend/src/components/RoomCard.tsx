@@ -28,12 +28,17 @@ interface DetectionState {
   frameHeight: number;
 }
 
+import { TriggerSource } from './Dashboard';
+
 interface RoomCardProps {
   name: string;
   capacity: number;
   roomId?: string;
   sessionId?: string;
   onStatsUpdate?: (update: AnalysisUpdate) => void;
+  triggerSource?: TriggerSource | null;
+  onRtspThumbnail?: (thumbnail: string) => void;
+  externalFileInput?: React.RefObject<HTMLInputElement | null>;
 }
 
 const EMOTION_COLOR: Record<string, string> = {
@@ -115,7 +120,7 @@ function drawDetections(
   });
 }
 
-export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpdate }: RoomCardProps) {
+export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpdate, triggerSource, onRtspThumbnail, externalFileInput }: RoomCardProps) {
   const id = roomId ?? name.toLowerCase().replace(/\s+/g, '-');
 
   const [source, setSource]         = useState<Source | null>(null);
@@ -140,6 +145,15 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
   const animFrameRef    = useRef<number>(0);
   const fileInputRef    = useRef<HTMLInputElement>(null);
   const uploadObjRef    = useRef<string | null>(null); // object URL for cleanup
+
+  // ── External trigger from Dashboard camera strip ──────────────
+  useEffect(() => {
+    if (!triggerSource) return;
+    stopSource();
+    if (triggerSource.type === 'webcam') startWebcam();
+    else if (triggerSource.type === 'rtsp' && triggerSource.url) startRtspPolling(triggerSource.url);
+    // 'upload' is handled by externalFileInput in Dashboard
+  }, [triggerSource?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Redraw overlay on detection change
   const redrawOverlay = useCallback(() => {
@@ -275,7 +289,9 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
         };
         applyAnalysis(g, d, event.latency_ms ?? 0);
         if (event.thumbnail_b64) {
-          setRtspThumbnail(`data:image/jpeg;base64,${event.thumbnail_b64}`);
+          const uri = `data:image/jpeg;base64,${event.thumbnail_b64}`;
+          setRtspThumbnail(uri);
+          onRtspThumbnail?.(uri);
         }
         setLiveData(prev => ({ ...prev, lastUpdated: new Date().toLocaleTimeString(), latencyMs: event.latency_ms ?? prev.latencyMs }));
       } catch {}
@@ -371,11 +387,12 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
   };
 
   return (
-    <div className="flex flex-col gap-6 w-full h-full">
+    <div className="flex flex-col gap-4 w-full h-full">
       {/* ── Video panel ──────────────────────────────────────────────────────── */}
       <div
         ref={containerRef}
-        className="w-full aspect-video sm:aspect-auto sm:h-[400px] xl:h-auto xl:flex-1 bg-black rounded-2xl border border-white/10 relative overflow-hidden flex flex-col shadow-lg"
+        className="w-full rounded-2xl relative overflow-hidden flex flex-col shadow-lg"
+        style={{ background: '#000', border: '1px solid var(--border-0)', minHeight: 340, flex: 1 }}
       >
         {/* Live badge */}
         <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
@@ -412,41 +429,27 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
           </div>
         )}
 
-        {/* No source */}
+        {/* No source — point user to strip above */}
         {!source && (
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-6 sm:p-8 gap-5">
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-14 h-14 bg-blue-900/20 rounded-2xl flex items-center justify-center border border-blue-500/15">
-                <svg className="w-7 h-7 text-blue-500/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-gray-300 font-semibold text-sm">{name}</p>
-                <p className="text-gray-600 text-xs mt-0.5">Select a source to begin AI analysis</p>
-              </div>
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-8 gap-4">
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
+                 style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)' }}>
+              <svg className="w-8 h-8" style={{ color: 'rgba(59,130,246,0.5)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
             </div>
-            <div className="grid grid-cols-2 gap-2.5 w-full max-w-xs">
-              <button onClick={startWebcam}
-                className="flex flex-col items-center gap-2 px-3 py-3.5 bg-blue-600/15 hover:bg-blue-600/25 border border-blue-500/25 rounded-xl text-blue-300 text-xs font-semibold transition-all hover:border-blue-500/50">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                Webcam
-              </button>
-              <button onClick={() => { setPendingType('rtsp'); setShowModal(true); }}
-                className="flex flex-col items-center gap-2 px-3 py-3.5 bg-green-600/15 hover:bg-green-600/25 border border-green-500/25 rounded-xl text-green-300 text-xs font-semibold transition-all hover:border-green-500/50">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" /></svg>
-                RTSP / CCTV
-              </button>
-              <button onClick={() => { setPendingType('youtube'); setShowModal(true); }}
-                className="flex flex-col items-center gap-2 px-3 py-3.5 bg-red-600/15 hover:bg-red-600/25 border border-red-500/25 rounded-xl text-red-300 text-xs font-semibold transition-all hover:border-red-500/50">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                YouTube
-              </button>
-              <button onClick={() => fileInputRef.current?.click()}
-                className="flex flex-col items-center gap-2 px-3 py-3.5 bg-purple-600/15 hover:bg-purple-600/25 border border-purple-500/25 rounded-xl text-purple-300 text-xs font-semibold transition-all hover:border-purple-500/50">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                Upload File
-              </button>
+            <div>
+              <p className="font-semibold text-sm text-white/80">{name}</p>
+              <p className="text-[11px] mt-1 text-white/30">
+                Select a camera from the strip above to begin AI analysis
+              </p>
+            </div>
+            <div className="flex items-center gap-2 mt-2">
+              <svg className="w-3.5 h-3.5 text-white/25" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+              </svg>
+              <span className="text-[10px] text-white/25 uppercase tracking-widest font-mono">Camera strip above</span>
             </div>
           </div>
         )}
@@ -505,7 +508,7 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
           </div>
         )}
 
-        {/* Hidden file input for video upload */}
+        {/* Hidden file input for video upload (also handled externally via externalFileInput) */}
         <input ref={fileInputRef} type="file" accept="video/*" className="hidden" onChange={handleFileUpload} />
 
         {/* Hidden capture canvas (webcam + upload) */}
@@ -518,96 +521,95 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
         />
 
         {/* Status bar */}
-        <div className="absolute bottom-4 left-4 flex flex-col gap-1.5 w-[calc(100%-2rem)] md:w-auto z-10">
-          <div className="px-3 py-1.5 bg-[#0b1120]/90 backdrop-blur-md border border-white/10 rounded-md text-[9px] font-mono text-gray-400 uppercase truncate">
-            {source?.type === 'rtsp'
-              ? 'ENGINE: SERVER-SIDE DEEPFACE MTCNN + HOG + GEMINI'
-              : source?.type === 'upload'
-              ? 'ENGINE: VIDEO UPLOAD · GEMINI 2.0 FLASH + DEEPFACE MTCNN'
-              : 'ENGINE: GEMINI 2.0 FLASH + DEEPFACE MTCNN + HOG'}
+        <div className="absolute bottom-3 left-3 flex flex-col gap-1 w-auto z-10">
+          <div className="overlay-bar">
+            {source?.type === 'rtsp' ? 'Server-Side · DeepFace MTCNN + HOG + Gemini'
+              : source?.type === 'upload' ? 'Upload · Gemini 2.0 Flash + DeepFace MTCNN'
+              : 'Gemini 2.0 Flash + DeepFace MTCNN + HOG'}
           </div>
-          <div className={`px-3 py-1.5 bg-[#0b1120]/90 backdrop-blur-md border ${source ? 'border-amber-500/30' : 'border-white/10'} rounded-md text-[9px] font-mono ${source ? engColor : 'text-gray-500'} uppercase flex items-center gap-2 truncate`}>
-            <div className={`w-1.5 h-1.5 shrink-0 rounded-full ${source ? engBg : 'bg-gray-600'}`}></div>
-            {source ? `ANALYSIS ACTIVE · ${ANALYSIS_INTERVAL_MS / 1000}s INTERVAL` : 'PIPELINE IDLE — SELECT A SOURCE'}
-          </div>
-          <div className="px-3 py-1.5 bg-[#0b1120]/90 backdrop-blur-md border border-white/10 rounded-md text-[9px] font-mono text-gray-400 uppercase flex items-center gap-2 truncate">
-            <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            {liveData.latencyMs ? `LATENCY: ${liveData.latencyMs}ms` : 'AWAITING FRAME...'}
+          <div className="overlay-bar">
+            <div className={`w-1.5 h-1.5 shrink-0 rounded-full ${source ? engBg : 'bg-gray-600'}`} />
+            {source ? `Analysis Active · ${ANALYSIS_INTERVAL_MS / 1000}s interval` : 'Pipeline idle'}
+            {liveData.latencyMs ? ` · ${liveData.latencyMs}ms` : ''}
           </div>
         </div>
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 xl:gap-6 shrink-0 w-full">
-        <div className="bg-[#121b2f] border border-white/5 p-5 md:p-6 rounded-2xl flex flex-col justify-center shadow-sm">
-          <div className="flex items-center gap-2.5 mb-3">
-            <svg className="w-5 h-5 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-            <span className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold">Class Sentiment</span>
-          </div>
-          <span className="text-xl font-bold text-white capitalize leading-tight">{liveData.sentiment}</span>
-          {liveData.dominantEmotion !== '—' && <span className="text-xs text-gray-500 mt-1">Dominant: {liveData.dominantEmotion}</span>}
-        </div>
-        <div className="bg-[#121b2f] border border-white/5 p-5 md:p-6 rounded-2xl flex flex-col justify-center shadow-sm">
-          <div className="flex items-center gap-2.5 mb-3">
-            <svg className="w-5 h-5 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            <span className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold">Attention Score</span>
-          </div>
-          <span className={`text-4xl font-bold ${source ? engColor : 'text-gray-600'} leading-none`}>
-            {source ? `${liveData.engagement}%` : '—'}
-          </span>
-          {liveData.attentionRate !== null && <span className="text-xs text-gray-500 mt-1">DeepFace: {liveData.attentionRate}% attentive</span>}
-        </div>
-        <div className="bg-[#121b2f] border border-white/5 p-5 md:p-6 rounded-2xl flex flex-col justify-center shadow-sm">
-          <div className="flex items-center gap-2.5 mb-3">
-            <svg className="w-5 h-5 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-            <span className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold">Subjects Present</span>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-4xl font-bold text-white leading-none">{source ? liveData.headcount : '—'}</span>
-            <span className="text-base font-medium text-gray-500">/ {capacity}</span>
-          </div>
-          {liveData.lecturerPresent && <span className="text-xs text-green-500 mt-1">✓ Lecturer present</span>}
-          {detection.faces.length > 0 && (
-            <span className="text-[10px] text-gray-600 mt-0.5 font-mono">
-              {detection.faces.filter(f => f.attention).length}/{detection.faces.length} attentive
+      <div className="grid grid-cols-3 gap-3 shrink-0 w-full">
+        {[
+          {
+            icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>,
+            label: 'Sentiment',
+            value: liveData.sentiment,
+            sub: liveData.dominantEmotion !== '—' ? `Dominant: ${liveData.dominantEmotion}` : null,
+            color: 'var(--brand)',
+            active: liveData.sentiment !== '—',
+          },
+          {
+            icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+            label: 'Engagement',
+            value: source ? `${liveData.engagement}%` : '—',
+            sub: liveData.attentionRate !== null ? `DeepFace: ${liveData.attentionRate}% attentive` : null,
+            color: liveData.engagement > 79 ? 'var(--success)' : liveData.engagement > 49 ? 'var(--warning)' : 'var(--danger)',
+            active: !!source,
+          },
+          {
+            icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>,
+            label: 'Present',
+            value: source ? `${liveData.headcount} / ${capacity}` : '—',
+            sub: liveData.lecturerPresent ? '✓ Lecturer detected' : detection.faces.length > 0 ? `${detection.faces.filter(f => f.attention).length}/${detection.faces.length} attentive` : null,
+            color: 'var(--success)',
+            active: !!source,
+          },
+        ].map(stat => (
+          <div key={stat.label} className="rounded-xl p-4 flex flex-col transition-theme"
+               style={{ background: 'var(--surface-2)', border: '1px solid var(--border-0)', boxShadow: 'var(--shadow-sm)' }}>
+            <div className="flex items-center gap-2 mb-2">
+              <span style={{ color: 'var(--text-2)' }}>{stat.icon}</span>
+              <span className="text-[9px] uppercase tracking-widest font-bold" style={{ color: 'var(--text-2)' }}>
+                {stat.label}
+              </span>
+            </div>
+            <span className="text-xl font-bold leading-none capitalize"
+                  style={{ color: stat.active ? stat.color : 'var(--text-3)' }}>
+              {stat.value}
             </span>
-          )}
-        </div>
+            {stat.sub && <span className="text-[10px] mt-1" style={{ color: 'var(--text-2)' }}>{stat.sub}</span>}
+          </div>
+        ))}
       </div>
 
-      {/* Source modal */}
+      {/* Source modal (YouTube only — RTSP is handled by Dashboard strip) */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#121b2f] border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl">
-            <h3 className="text-white font-bold text-lg mb-1">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay">
+          <div className="rounded-2xl p-6 w-full max-w-md shadow-2xl fade-up"
+               style={{ background: 'var(--surface-2)', border: '1px solid var(--border-1)' }}>
+            <h3 className="font-bold text-lg mb-1" style={{ color: 'var(--text-0)' }}>
               {pendingType === 'youtube' ? 'YouTube Stream' : 'RTSP / IP Camera'}
             </h3>
-            <p className="text-gray-400 text-sm mb-2">
+            <p className="text-sm mb-4" style={{ color: 'var(--text-2)' }}>
               {pendingType === 'youtube'
                 ? 'Enter a YouTube video or livestream URL.'
-                : 'Enter your RTSP or IP camera stream URL. The backend will capture frames server-side and stream analysis results back in real time.'}
+                : 'Enter your RTSP or IP camera stream URL.'}
             </p>
-            {pendingType === 'rtsp' && (
-              <div className="mb-4 px-3 py-2 bg-green-900/20 border border-green-500/20 rounded-lg text-[11px] text-green-400 font-mono">
-                ✓ Full AI analysis (DeepFace + Gemini) runs server-side — bounding boxes and engagement data streamed via SSE
-              </div>
-            )}
             <input
               type="text"
               value={urlInput}
               onChange={e => setUrlInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleUrlSubmit()}
               placeholder={pendingType === 'youtube' ? 'https://youtube.com/watch?v=...' : 'rtsp://192.168.1.100:554/stream'}
-              className="w-full bg-[#0b1120] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors mb-4 font-mono"
+              className="field font-mono text-sm mb-4"
               autoFocus
             />
             <div className="flex gap-3">
               <button onClick={() => { setShowModal(false); setUrlInput(''); setPendingType(null); }}
-                className="flex-1 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-gray-400 text-sm font-medium transition-colors">
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
+                style={{ background: 'var(--surface-3)', border: '1px solid var(--border-1)', color: 'var(--text-1)' }}>
                 Cancel
               </button>
               <button onClick={handleUrlSubmit}
-                className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-xl text-white text-sm font-semibold transition-colors">
+                className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl text-white text-sm font-semibold transition-colors">
                 Connect
               </button>
             </div>
