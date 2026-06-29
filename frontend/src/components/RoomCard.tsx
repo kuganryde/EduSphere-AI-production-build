@@ -414,29 +414,38 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
 
         {/* No source */}
         {!source && (
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-6 sm:p-8">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-blue-900/20 rounded-full flex items-center justify-center mb-4 border border-blue-500/20">
-              <svg className="w-8 h-8 sm:w-10 sm:h-10 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-6 sm:p-8 gap-5">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-14 h-14 bg-blue-900/20 rounded-2xl flex items-center justify-center border border-blue-500/15">
+                <svg className="w-7 h-7 text-blue-500/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-gray-300 font-semibold text-sm">{name}</p>
+                <p className="text-gray-600 text-xs mt-0.5">Select a source to begin AI analysis</p>
+              </div>
             </div>
-            <h3 className="text-gray-300 font-mono text-xs sm:text-sm tracking-widest uppercase mb-4">{name}</h3>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button onClick={startWebcam} className="flex items-center gap-2 px-4 py-2 bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 rounded-xl text-blue-300 text-xs font-semibold transition-colors">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                Use Webcam
+            <div className="grid grid-cols-2 gap-2.5 w-full max-w-xs">
+              <button onClick={startWebcam}
+                className="flex flex-col items-center gap-2 px-3 py-3.5 bg-blue-600/15 hover:bg-blue-600/25 border border-blue-500/25 rounded-xl text-blue-300 text-xs font-semibold transition-all hover:border-blue-500/50">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                Webcam
               </button>
-              <button onClick={() => { setPendingType('youtube'); setShowModal(true); }} className="flex items-center gap-2 px-4 py-2 bg-red-600/20 hover:bg-red-600/40 border border-red-500/30 rounded-xl text-red-300 text-xs font-semibold transition-colors">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-2.75 12.38 12.38 0 00-5.64 0A4.83 4.83 0 016.41 6.69 4.93 4.93 0 012 11.5v1a4.93 4.93 0 014.41 4.81 4.83 4.83 0 013.77 2.75 12.38 12.38 0 005.64 0 4.83 4.83 0 013.77-2.75A4.93 4.93 0 0122 12.5v-1a4.93 4.93 0 01-2.41-4.81zM10 15V9l5 3z"/></svg>
-                YouTube URL
+              <button onClick={() => { setPendingType('rtsp'); setShowModal(true); }}
+                className="flex flex-col items-center gap-2 px-3 py-3.5 bg-green-600/15 hover:bg-green-600/25 border border-green-500/25 rounded-xl text-green-300 text-xs font-semibold transition-all hover:border-green-500/50">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" /></svg>
+                RTSP / CCTV
               </button>
-              <button onClick={() => { setPendingType('rtsp'); setShowModal(true); }} className="flex items-center gap-2 px-4 py-2 bg-green-600/20 hover:bg-green-600/40 border border-green-500/30 rounded-xl text-green-300 text-xs font-semibold transition-colors">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" /></svg>
-                RTSP / IP Camera
+              <button onClick={() => { setPendingType('youtube'); setShowModal(true); }}
+                className="flex flex-col items-center gap-2 px-3 py-3.5 bg-red-600/15 hover:bg-red-600/25 border border-red-500/25 rounded-xl text-red-300 text-xs font-semibold transition-all hover:border-red-500/50">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                YouTube
               </button>
-              <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 rounded-xl text-purple-300 text-xs font-semibold transition-colors">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                Upload Video
+              <button onClick={() => fileInputRef.current?.click()}
+                className="flex flex-col items-center gap-2 px-3 py-3.5 bg-purple-600/15 hover:bg-purple-600/25 border border-purple-500/25 rounded-xl text-purple-300 text-xs font-semibold transition-all hover:border-purple-500/50">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                Upload File
               </button>
             </div>
           </div>

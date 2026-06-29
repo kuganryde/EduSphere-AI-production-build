@@ -5,9 +5,9 @@ import { getAuthHeader } from '../context/AuthContext';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 const LEVEL_STYLES: Record<number, { bg: string; border: string; text: string; icon: string }> = {
-  1: { bg: 'bg-blue-900/20',  border: 'border-blue-500/30',  text: 'text-blue-400',  icon: 'ℹ' },
-  2: { bg: 'bg-amber-900/20', border: 'border-amber-500/30', text: 'text-amber-400', icon: '⚠' },
-  3: { bg: 'bg-red-900/20',   border: 'border-red-500/30',   text: 'text-red-400',   icon: '🚨' },
+  1: { bg: 'bg-blue-900/20',  border: 'border-blue-500/25',  text: 'text-blue-400',  icon: 'i' },
+  2: { bg: 'bg-amber-900/20', border: 'border-amber-500/25', text: 'text-amber-400', icon: '!' },
+  3: { bg: 'bg-red-900/20',   border: 'border-red-500/25',   text: 'text-red-400',   icon: '!!' },
 };
 
 interface AlertLogProps {

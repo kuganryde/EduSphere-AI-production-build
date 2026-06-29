@@ -3,8 +3,8 @@ import { AnalysisUpdate } from './types';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginModal from './components/LoginModal';
 
-const Dashboard    = lazy(() => import('./components/Dashboard'));
-const OperatorMode = lazy(() => import('./components/OperatorMode'));
+const Dashboard     = lazy(() => import('./components/Dashboard'));
+const OperatorMode  = lazy(() => import('./components/OperatorMode'));
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
 const ReportsPage   = lazy(() => import('./pages/ReportsPage'));
 const AuditLogPage  = lazy(() => import('./pages/AuditLogPage'));
@@ -13,36 +13,69 @@ type Page = 'dashboard' | 'operator' | 'analytics' | 'reports' | 'audit';
 
 const Spinner = () => (
   <div className="flex-1 flex items-center justify-center">
-    <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+    <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
   </div>
 );
 
-function NavButton({
-  icon, label, active, onClick, requirePerm, hidden,
-}: {
-  icon: React.ReactNode; label: React.ReactNode; active: boolean;
-  onClick: () => void; requirePerm?: string; hidden?: boolean;
-}) {
-  const { can } = useAuth();
-  if (hidden) return null;
-  if (requirePerm && !can(requirePerm)) return null;
-  return (
-    <button
-      onClick={onClick}
-      className={`flex items-center justify-center lg:justify-start gap-4 px-3 lg:px-4 py-2 lg:py-3 ${
-        active
-          ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20'
-          : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
-      } rounded-xl w-auto md:w-full transition-colors shrink-0`}
-    >
-      <span className="w-5 h-5 shrink-0">{icon}</span>
-      <span className="hidden lg:block text-sm font-medium text-left leading-tight whitespace-nowrap">{label}</span>
-    </button>
-  );
-}
+const NAV_ITEMS: {
+  id: Page; label: string; sublabel?: string; perm?: string; hidden?: boolean;
+  icon: React.ReactNode;
+}[] = [
+  {
+    id: 'dashboard', label: 'Dashboard', sublabel: 'Real-time',
+    icon: (
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+          d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'operator', label: 'Operator', sublabel: 'Display mode', perm: 'operator_mode',
+    icon: (
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+          d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'analytics', label: 'Analytics', sublabel: 'Trends & rooms', perm: 'view_analytics',
+    icon: (
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+          d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'reports', label: 'Reports', sublabel: 'Session history', perm: 'view_reports',
+    icon: (
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'audit', label: 'Audit Log', sublabel: 'Admin only', perm: 'view_audit_logs',
+    icon: (
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+      </svg>
+    ),
+  },
+];
+
+const ROLE_CONFIG: Record<string, { label: string; dot: string }> = {
+  admin:    { label: 'Admin',    dot: 'bg-red-400' },
+  operator: { label: 'Operator', dot: 'bg-amber-400' },
+  viewer:   { label: 'Viewer',   dot: 'bg-blue-400' },
+};
 
 function AppShell() {
-  const { isAuthenticated, role, logout, can } = useAuth();
+  const { isAuthenticated, role, logout, can, openMode } = useAuth();
   const [page, setPage] = useState<Page>('dashboard');
   const [liveStats, setLiveStats] = useState<AnalysisUpdate | null>(null);
 
@@ -58,93 +91,104 @@ function AppShell() {
     );
   }
 
+  const roleMeta = ROLE_CONFIG[role ?? 'viewer'];
+
   return (
-    <div className="flex flex-col h-screen bg-[#0b1120] text-gray-200 overflow-hidden font-sans">
-      <main className="flex flex-1 overflow-hidden flex-col md:flex-row">
-        {/* Sidebar Nav */}
-        <nav className="w-full md:w-20 lg:w-64 border-b md:border-b-0 md:border-r border-white/5 bg-[#0e1526] flex flex-row md:flex-col p-2 md:p-4 shrink-0 overflow-x-auto md:overflow-visible no-scrollbar">
-          {/* Logo */}
-          <div className="flex flex-row md:flex-col items-center gap-3 md:mb-8 md:mt-2 shrink-0 mr-4 md:mr-0">
-            <div className="flex items-center gap-3 w-full px-2">
-              <div className="w-10 h-10 shrink-0 bg-blue-600 rounded-xl flex items-center justify-center">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-              </div>
-              <div className="hidden lg:flex flex-col">
-                <span className="text-lg font-bold tracking-tight text-white leading-tight">EduSphere</span>
-                <span className="text-xs text-blue-400 font-medium uppercase tracking-wider">Vision AI</span>
-              </div>
+    <div className="flex h-screen bg-[#0b1120] text-gray-200 overflow-hidden font-sans">
+      {/* ── Sidebar ─────────────────────────────────────────────────────────────── */}
+      <nav className="w-[72px] lg:w-60 border-r border-white/5 bg-[#0e1526] flex flex-col shrink-0">
+        {/* Logo */}
+        <div className="h-16 flex items-center px-4 lg:px-5 border-b border-white/5 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 shrink-0 bg-blue-600 rounded-lg flex items-center justify-center shadow-md shadow-blue-900/50">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+            </div>
+            <div className="hidden lg:block min-w-0">
+              <p className="text-sm font-bold text-white leading-tight">EduSphere</p>
+              <p className="text-[10px] text-blue-400 font-semibold uppercase tracking-widest leading-tight">Vision AI</p>
             </div>
           </div>
-
-          {/* Nav items */}
-          <div className="flex flex-row md:flex-col gap-2 md:mt-4 overflow-x-auto flex-1">
-            <NavButton
-              icon={<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>}
-              label={<>Real-time<br/>Dashboard</>} active={page === 'dashboard'} onClick={() => setPage('dashboard')}
-            />
-            <NavButton
-              icon={<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>}
-              label="Operator Mode" active={page === 'operator'} onClick={() => setPage('operator')}
-              requirePerm="operator_mode"
-            />
-            <NavButton
-              icon={<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>}
-              label="Detailed Analytics" active={page === 'analytics'} onClick={() => setPage('analytics')}
-              requirePerm="view_analytics"
-            />
-            <NavButton
-              icon={<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}
-              label="Student Reports" active={page === 'reports'} onClick={() => setPage('reports')}
-              requirePerm="view_reports"
-            />
-            <NavButton
-              icon={<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>}
-              label="Audit Log" active={page === 'audit'} onClick={() => setPage('audit')}
-              requirePerm="view_audit_logs"
-            />
-            <NavButton
-              icon={<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" /></svg>}
-              label={<>Biometric<br/>Enrollment</>} active={false} onClick={() => {}}
-              hidden={true}
-            />
-          </div>
-
-          {/* User/role badge + logout */}
-          <div className="hidden md:flex flex-col gap-2 mt-auto pt-4 border-t border-white/5">
-            <div className="px-2 py-2 rounded-xl bg-white/5 flex items-center gap-3">
-              <div className="w-7 h-7 rounded-lg bg-blue-700 flex items-center justify-center text-white text-xs font-bold uppercase shrink-0">
-                {role?.[0] ?? '?'}
-              </div>
-              <div className="hidden lg:block flex-1 min-w-0">
-                <p className="text-white text-xs font-semibold capitalize truncate">{role ?? 'Unknown'}</p>
-                <p className="text-gray-500 text-[10px] uppercase tracking-wider">Access level</p>
-              </div>
-            </div>
-            {can('view_dashboard') && (
-              <button onClick={logout} className="flex items-center justify-center lg:justify-start gap-3 px-3 py-2 text-gray-600 hover:text-red-400 hover:bg-red-900/10 rounded-xl text-xs transition-colors">
-                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                <span className="hidden lg:block">Sign Out</span>
-              </button>
-            )}
-          </div>
-        </nav>
-
-        {/* Content Area */}
-        <div className="flex-1 overflow-auto relative">
-          <Suspense fallback={
-            <div className="absolute inset-0 flex items-center justify-center bg-[#0b1120]">
-              <Spinner />
-            </div>
-          }>
-            {page === 'dashboard'  && <Dashboard onLiveStats={setLiveStats} />}
-            {page === 'analytics'  && <AnalyticsPage />}
-            {page === 'reports'    && <ReportsPage />}
-            {page === 'audit'      && <AuditLogPage />}
-          </Suspense>
         </div>
-      </main>
+
+        {/* Nav items */}
+        <div className="flex-1 py-3 px-2 lg:px-3 flex flex-col gap-0.5 overflow-y-auto">
+          <p className="hidden lg:block px-2 py-2 text-[9px] font-bold text-gray-600 uppercase tracking-[0.15em]">Navigation</p>
+          {NAV_ITEMS.map(item => {
+            if (item.hidden) return null;
+            if (item.perm && !can(item.perm)) return null;
+            const active = page === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setPage(item.id)}
+                title={item.label}
+                className={`group flex items-center gap-3 px-2 py-2.5 rounded-xl w-full text-left transition-all duration-150 ${
+                  active
+                    ? 'bg-blue-600/15 text-blue-400'
+                    : 'text-gray-500 hover:text-gray-200 hover:bg-white/5'
+                }`}
+              >
+                <span className={`w-5 h-5 shrink-0 transition-colors ${active ? 'text-blue-400' : 'text-gray-500 group-hover:text-gray-300'}`}>
+                  {item.icon}
+                </span>
+                <div className="hidden lg:block min-w-0">
+                  <p className={`text-sm font-medium leading-tight truncate ${active ? 'text-blue-300' : ''}`}>{item.label}</p>
+                  {item.sublabel && (
+                    <p className="text-[10px] text-gray-600 leading-tight truncate">{item.sublabel}</p>
+                  )}
+                </div>
+                {active && <div className="hidden lg:block ml-auto w-1 h-5 bg-blue-500 rounded-full shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Footer: role + logout */}
+        <div className="border-t border-white/5 p-2 lg:p-3 shrink-0">
+          {!openMode && (
+            <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl mb-1">
+              <div className="relative shrink-0">
+                <div className="w-7 h-7 rounded-lg bg-[#1a2540] border border-white/10 flex items-center justify-center">
+                  <span className="text-xs font-bold text-gray-300 uppercase">{role?.[0] ?? '?'}</span>
+                </div>
+                <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#0e1526] ${roleMeta?.dot ?? 'bg-gray-500'}`} />
+              </div>
+              <div className="hidden lg:block min-w-0 flex-1">
+                <p className="text-xs font-semibold text-gray-300 leading-tight">{roleMeta?.label ?? role}</p>
+                <p className="text-[10px] text-gray-600 leading-tight truncate">Access level</p>
+              </div>
+            </div>
+          )}
+          <button
+            onClick={logout}
+            title="Sign out"
+            className="flex items-center justify-center lg:justify-start gap-2.5 w-full px-2 py-2 rounded-xl text-gray-600 hover:text-red-400 hover:bg-red-900/10 transition-colors"
+          >
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            <span className="hidden lg:block text-xs font-medium">Sign Out</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* ── Content ──────────────────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-auto min-w-0">
+        <Suspense fallback={
+          <div className="flex items-center justify-center h-full">
+            <Spinner />
+          </div>
+        }>
+          {page === 'dashboard'  && <Dashboard onLiveStats={setLiveStats} />}
+          {page === 'analytics'  && <AnalyticsPage />}
+          {page === 'reports'    && <ReportsPage />}
+          {page === 'audit'      && <AuditLogPage />}
+        </Suspense>
+      </div>
     </div>
   );
 }
