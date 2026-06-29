@@ -2,6 +2,7 @@ import { Router } from "express";
 import { supabase } from "../supabase_service";
 import { requireRole } from "../middleware/rbac";
 import { logAudit } from "./audit";
+import { toUuid } from "../utils";
 
 const router = Router();
 
@@ -15,7 +16,7 @@ router.post("/", requireRole("operator"), async (req, res) => {
 
   const { data, error } = await supabase
     .from("sessions")
-    .insert({ room_id, lecturer_name, course_code, expected_capacity, status: "active" })
+    .insert({ room_id: toUuid(room_id), lecturer_name, course_code, expected_capacity, status: "active" })
     .select()
     .single();
 

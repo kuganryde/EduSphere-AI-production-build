@@ -3,6 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import rateLimit from "express-rate-limit";
 import { supabase } from "../supabase_service";
 import { broadcastToRoom } from "./stream";
+import { toUuid } from "../utils";
 
 const router = Router();
 
@@ -105,8 +106,8 @@ router.post("/", limiter, async (req, res) => {
       supabase
         .from("engagement_snapshots")
         .insert({
-          session_id,
-          room_id: effectiveRoomId,
+          session_id: toUuid(session_id),
+          room_id: toUuid(effectiveRoomId),
           engagement_score: resultData.engagement_score,
           headcount: resultData.headcount,
           lecturer_present: resultData.lecturer_present,
@@ -124,8 +125,8 @@ router.post("/", limiter, async (req, res) => {
     // Persist alert to alerts table + broadcast via SSE
     if (resultData.alert && effectiveRoomId) {
       const alertPayload = {
-        session_id: session_id ?? null,
-        room_id: effectiveRoomId,
+        session_id: toUuid(session_id),
+        room_id: toUuid(effectiveRoomId),
         level: ALERT_LEVEL[resultData.alert] ?? 1,
         message: ALERT_MESSAGE[resultData.alert] ?? resultData.alert,
         alert_type: resultData.alert,

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { supabase } from "../supabase_service";
 import { requireRole } from "../middleware/rbac";
+import { toUuid } from "../utils";
 
 const router = Router();
 
@@ -98,7 +99,8 @@ router.post("/snapshot", requireRole("operator"), async (req, res) => {
   const { data, error } = await supabase
     .from("engagement_snapshots")
     .insert({
-      session_id, room_id, engagement_score, headcount, lecturer_present,
+      session_id: toUuid(session_id), room_id: toUuid(room_id),
+      engagement_score, headcount, lecturer_present,
       classroom_sentiment, gestures, alert_level, attention_rate,
       dominant_emotion, emotion_breakdown, pedagogical_note, source: "webcam",
     })
@@ -121,7 +123,7 @@ router.post("/snapshot", requireRole("operator"), async (req, res) => {
       lecturer_absent:  "Lecturer not visible — supervision gap detected",
     };
     await supabase.from("alerts").insert({
-      session_id, room_id,
+      session_id: toUuid(session_id), room_id: toUuid(room_id),
       level: LEVEL[alert_type] ?? 1,
       message: MSG[alert_type] ?? alert_type,
       alert_type,

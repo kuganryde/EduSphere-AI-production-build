@@ -4,6 +4,7 @@ import { startPolling, stopPolling, getActivePollRooms, isPolling } from "../pol
 import { broadcastToRoom } from "./stream";
 import { GoogleGenAI } from "@google/genai";
 import { requireRole } from "../middleware/rbac";
+import { toUuid } from "../utils";
 
 const router = Router();
 
@@ -118,8 +119,8 @@ async function pollRtspOnce(roomId: string, rtspUrl: string, sessionId: string |
   // Persist snapshot
   if (sessionId) {
     supabase.from("engagement_snapshots").insert({
-      session_id: sessionId,
-      room_id: roomId,
+      session_id: toUuid(sessionId),
+      room_id: toUuid(roomId),
       engagement_score: analysisEvent.engagement_score,
       headcount: analysisEvent.headcount,
       lecturer_present: analysisEvent.lecturer_present,
@@ -139,8 +140,8 @@ async function pollRtspOnce(roomId: string, rtspUrl: string, sessionId: string |
   // Persist alert + re-broadcast alert event
   if (analysisEvent.alert && roomId) {
     supabase.from("alerts").insert({
-      session_id: sessionId ?? null,
-      room_id: roomId,
+      session_id: toUuid(sessionId),
+      room_id: toUuid(roomId),
       level: ALERT_LEVEL[analysisEvent.alert] ?? 1,
       message: ALERT_MESSAGE[analysisEvent.alert] ?? analysisEvent.alert,
       alert_type: analysisEvent.alert,
