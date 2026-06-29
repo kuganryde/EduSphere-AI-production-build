@@ -329,8 +329,10 @@ class VLCCapture:
         # ── Shared pixel buffer  (RGBA, 4 bytes/pixel) ────────────────────────
         self._buf_len = self.RENDER_W * self.RENDER_H * 4
         self._buf     = (ctypes.c_ubyte * self._buf_len)()
-        # Stable pointer used inside the lock callback
-        self._buf_ptr = ctypes.cast(ctypes.byref(self._buf), ctypes.c_void_p).value
+        # Cast the array itself to void* — stable for the lifetime of self._buf.
+        # Do NOT use ctypes.byref() here: byref() is a temporary borrow whose
+        # .value is only valid while the byref object is alive.
+        self._buf_ptr = ctypes.cast(self._buf, ctypes.c_void_p).value
 
         # ── VLC instance ───────────────────────────────────────────────────────
         self._inst = _vlc.Instance([
@@ -379,7 +381,10 @@ class VLCCapture:
         Called by the VLC decoder thread each time a frame is ready.
         Converts RGBA buffer → BGR numpy array and stores it thread-safely.
         """
-        arr = np.frombuffer(self._buf, dtype=np.uint8).reshape(
+        # .copy() is mandatory: np.frombuffer gives a read-only VIEW into the
+        # live ctypes buffer. Without it, cvtColor reads the same memory VLC
+        # may be writing into for the next frame (data race).
+        arr = np.frombuffer(self._buf, dtype=np.uint8).copy().reshape(
             self.RENDER_H, self.RENDER_W, 4
         )
         bgr = cv2.cvtColor(arr, cv2.COLOR_RGBA2BGR)
