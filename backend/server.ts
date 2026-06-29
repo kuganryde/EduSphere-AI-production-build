@@ -39,6 +39,7 @@ app.use(helmet({
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   process.env.FRONTEND_URL_VERCEL,
+  "https://edu-sphere-ai-production-build.vercel.app",
   "https://eduspherevision.netlify.app",
   "https://eduspheredetection.netlify.app",
   "http://localhost:5173",
