@@ -4,7 +4,7 @@
 
 ## Real-time classroom intelligence platform for universities
 
-Live emotion analytics · DeepFace detection · Gemini 2.0 Flash · RTSP / Webcam / Upload · Night & Day theme · RBAC · PDPA-compliant
+Live emotion analytics · HSEmotion VA sentiment · Gemini 2.0 Flash · RTSP / Webcam / Upload · Night & Day theme · RBAC · PDPA-compliant
 
 ---
 
@@ -16,7 +16,7 @@ Live emotion analytics · DeepFace detection · Gemini 2.0 Flash · RTSP / Webca
 [![Gemini](https://img.shields.io/badge/Gemini-2.0_Flash-4285F4?logo=google&logoColor=white)](https://ai.google.dev)
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://python.org)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.35+-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io)
-[![YOLOv8](https://img.shields.io/badge/YOLOv8-Pose-00BFFF?logo=ultralytics&logoColor=white)](https://ultralytics.com)
+[![YOLOv11](https://img.shields.io/badge/YOLOv11-Pose-00BFFF?logo=ultralytics&logoColor=white)](https://ultralytics.com)
 
 </div>
 
@@ -24,14 +24,14 @@ Live emotion analytics · DeepFace detection · Gemini 2.0 Flash · RTSP / Webca
 
 ## Overview
 
-EduSphere AI is a full-stack university classroom monitoring platform. It captures live video from onboard webcams, RTSP IP cameras, or uploaded recordings, runs dual AI analysis (Google Gemini 2.0 Flash + DeepFace MTCNN), and streams real-time engagement, emotion, and attention data back to educators — all within a Guard Up-style dashboard designed for institutional use.
+EduSphere AI is a full-stack university classroom monitoring platform. It captures live video from onboard webcams, RTSP IP cameras, or uploaded recordings, runs dual AI analysis (Google Gemini 2.0 Flash + HSEmotion), and streams real-time engagement, emotion, and attention data back to educators — all within a Guard Up-style dashboard designed for institutional use.
 
 The platform ships two complementary monitors:
 
 | Component | Technology | Purpose |
 | --------- | ---------- | ------- |
-| **EduSphere Web Dashboard** | React 18 + Node.js + Supabase | Full-stack session management, historical analytics, RBAC, PDPA |
-| **RydeGate Classroom Intelligence** | Python + Streamlit + YOLOv8-Pose | Standalone local monitor — skeleton gesture detection, blended sentiment, non-blocking RTSP |
+| **EduSphere Web Dashboard** | React 18 · Node.js · Supabase | Full-stack session management, historical analytics, RBAC, PDPA |
+| **RydeGate Classroom Intelligence** | Python · Streamlit · YOLOv11-Pose · YOLO-World · HSEmotion | Standalone local monitor — VA sentiment, gesture detection, object awareness, non-blocking RTSP |
 
 ---
 
@@ -41,24 +41,25 @@ The platform ships two complementary monitors:
 
 | Source | How it works |
 | ------ | ------------ |
-| **Onboard Webcam** | `getUserMedia` in-browser capture — frames sent directly to Gemini + DeepFace |
-| **RTSP / IP Camera** | Server-side `cv2.VideoCapture` in the Python service; results streamed via SSE |
-| **Video Upload** | Local recording played back in the browser; analyzed on the same 15 s interval |
+| **Onboard Webcam** | `getUserMedia` in-browser capture — frames sent to Gemini + HSEmotion |
+| **RTSP / IP Camera** | VLC memory-callback (`libvlc`) for RTSP-TCP; `FrameBuffer` daemon thread for stable feed |
+| **Video Upload** | Local recording played back in browser; analyzed on the same 15 s interval |
 
 ### Guard Up-Style Dashboard
 
 - **Camera strip at top** — one tile per source (Webcam, CCTV Cam 1, CCTV Cam 2, Upload, + Add RTSP). Click any tile to switch instantly. LIVE badge + glow ring on the active feed.
 - **Stop Feed bar** — appears below the strip when a feed is active; one click to stop.
-- **Main video panel** — bounding-box overlay: corner-bracket faces (emotion-colored), dashed blue person boxes.
+- **Main video panel** — bounding-box overlay: emotion-coloured person boxes with gesture icon, VA valence badge, and posture bar.
 - **Quick-stats sidebar** — Engagement %, Headcount / Capacity, Attention %, Lecturer Presence — updated every 15 s.
 - **Session Panel** — start / stop recorded sessions with lecturer name, course code, capacity.
 
 ### Real-time Emotion Analytics
 
-- **Live Emotion Panel** — 7-emotion horizontal progress bars (happy · neutral · surprise · sad · angry · fear · disgust) with per-face chips showing each face's emotion + attention status (✓ / ✗).
-- **Gemini Pedagogical Note** — Gemini's actionable sentence for the educator displayed live (e.g. "Consider a short interactive quiz to re-engage the back rows").
+- **Live Emotion Panel** — 7-emotion horizontal progress bars (happy · neutral · surprise · sad · angry · fear · disgust) with per-face chips showing emotion, attention status (✓ / ✗), classroom state, and detected objects.
+- **Valence-Arousal Panel** — continuous V/A coordinates from Russell's circumplex model; classroom state badge (Participatory / Attentive / Distressed / Disengaged / Neutral).
+- **Gemini Pedagogical Note** — Gemini's actionable sentence for the educator (e.g. "Consider a short quiz to re-engage the back rows").
 - **Emotion Timeline Chart** — per-emotion line chart growing in real time over the session duration.
-- **Engagement Chart** — dual-line area chart (Engagement % + DeepFace Attention %).
+- **Engagement Chart** — dual-line area chart (Engagement % + Attention %).
 - **Gesture Breakdown** — donut chart: writing notes · looking at board · hands raised · using phone · heads down.
 - **Alert Log** — level-coded (info / warning / critical) alerts for high distraction, low attendance, lecturer absence; real-time SSE push + dismiss.
 
@@ -66,7 +67,7 @@ The platform ships two complementary monitors:
 
 - **7-day engagement trend** — AreaChart across all sessions
 - **Room engagement snapshot** — BarChart per configured room
-- **Per-session emotion breakdown** — horizontal BarChart showing average emotion distribution from DeepFace across the full session
+- **Per-session emotion breakdown** — horizontal BarChart showing average emotion distribution across the full session
 - **Session reports** — timeline sparkline, gesture totals, sentiment distribution, alert count; JSON export
 
 ### Theme System
@@ -87,59 +88,105 @@ The platform ships two complementary monitors:
 
 ## RydeGate Classroom Intelligence (`rydegate_classroom.py`)
 
-A standalone Python/Streamlit application that runs on any machine with a camera or RTSP connection. No cloud services required — all analysis runs locally.
+A standalone Python/Streamlit application that runs on any machine with a camera or RTSP connection. All analysis runs locally — no cloud services required.
 
 ### Non-blocking Video Pipeline
 
-The core problem with vanilla `cv2.VideoCapture` in RTSP mode is that `VideoCapture()` and `cap.read()` can block for several seconds when the stream is slow or unstable, freezing the UI. `rydegate_classroom.py` fixes this with a **`FrameBuffer` class**:
+`cv2.VideoCapture` in RTSP mode blocks for several seconds on slow or unstable streams, freezing the UI. RydeGate solves this with two complementary capture classes:
+
+**`FrameBuffer`** — for file, webcam, and YouTube sources:
 
 ```
 FrameBuffer (daemon thread)
-  └── _resolve_url()   ← URL/yt_dlp resolution runs here, never in main thread
-  └── cap.grab()       ← non-blocking grab; retrieve() only when frame is needed
-  └── queue.Queue(maxsize=2)  ← drop oldest frame, always keep newest
+  ├── _resolve()    URL/yt-dlp resolution — never blocks the main thread
+  ├── cap.grab()    non-blocking grab; retrieve() only when a frame is needed
+  ├── queue.Queue(maxsize=2)   drop oldest, always keep newest frame
   └── exponential backoff reconnect (1 s → 10 s)
 
 Main Streamlit loop
-  └── buf.read_latest()   ← queue.get_nowait() — returns instantly or (False, None)
+  └── buf.read_latest()  →  queue.get_nowait() — returns instantly or (False, None)
 ```
+
+**`VLCCapture`** — for RTSP / RTSPS streams:
+Uses `libvlc` memory-rendering callbacks (`lock / unlock / display`) so VLC decodes the stream in its own thread and writes directly into a shared ctypes pixel buffer. The main thread reads a copy via `np.frombuffer(...).copy()` — zero blocking, no GIL contention.
 
 Status transitions are shown in a live banner: `connecting → streaming → reconnecting`.
 
-### Skeleton Gesture Detection
+### Emotion Engine — HSEmotion EfficientNet-B2
 
-Switched from `yolov8n.pt` (bounding boxes only) to `yolov8n-pose.pt` (bounding boxes + 17 COCO skeleton keypoints). The `classify_gesture()` function uses wrist / shoulder / hip Y-positions to classify each student in real time:
+Replaces DeepFace. **HSEmotion `enet_b2_8`** is an EfficientNet-B2 model trained on AffectNet-8 (450 000+ labeled images) and exported to ONNX for fast CPU inference.
 
-| Gesture | Detection Rule |
+- Returns 8 FER+ class probabilities per face crop (Anger, Contempt, Disgust, Fear, Happiness, Neutral, Sadness, Surprise)
+- Probability-weighted average over Russell's circumplex coordinates gives continuous **Valence** (−1 → +1) and **Arousal** (−1 → +1) per student
+
+### Valence-Arousal Sentiment (Russell Circumplex)
+
+Each student's continuous VA position is mapped to a behavioural classroom state:
+
+| Classroom State | Valence | Arousal | Meaning |
+| --------------- | ------- | ------- | ------- |
+| **Participatory** | ≥ +0.25 | ≥ +0.20 | Energised, positive — ideal for debates, group work |
+| **Attentive** | ≥ +0.20 | < +0.20 | Calm focus — ideal for direct instruction |
+| **Distressed** | < −0.15 | ≥ +0.30 | Frustration or anxiety — pause and check comprehension |
+| **Disengaged** | < −0.15 | < +0.15 | Low energy, low affect — energiser recommended |
+| **Neutral** | — | — | Baseline / transitional |
+
+Class-level sentiment blends two independent signals:
+
+```
+sentiment = VA_valence × 0.60 + gestural_valence × 0.40
+
+gestural_valence:  raised_hand=+1.0  writing=+0.80  looking_forward=+0.70
+                   phone=−0.60  head_down=−0.70  unknown=0.0
+```
+
+### Skeleton Gesture Detection — YOLOv11n-Pose
+
+Upgraded from YOLOv8n-pose to **YOLOv11n-pose** (~10 % better mAP, drop-in replacement). The `classify_gesture()` function uses 17 COCO skeleton keypoints to classify each student in real time:
+
+| Gesture | Detection rule |
 | ------- | -------------- |
-| ✋ Raised Hand | Wrist Y < shoulder Y − 30% body height |
-| 😔 Head Down | Nose Y > shoulder Y + 18% body height |
-| ✍ Writing | Both wrists in desk zone (55–100% body height) |
+| ✋ Raised Hand | Wrist Y < shoulder Y − 30 % body height |
+| 😔 Head Down | Nose Y > shoulder Y + 18 % body height |
+| ✍ Writing | Both wrists in desk zone (55–100 % body height) |
 | 📱 Phone | Single wrist at desk zone near body centreline |
 | 👁 Looking Forward | None of the above |
 
-### Blended Sentiment Score
+Posture score (0–100) is derived from the shoulder-to-hip lean angle: `score = 100 − lean_deg × 2.8`. An upright student scores 100; a student leaning back 30 ° scores ~16.
 
-Each student receives a combined sentiment score (0–100) mixing two independent signals:
+### Multi-Signal Engagement
 
 ```
-sentiment = facial_score × 0.60 + gestural_score × 0.40
-
-facial_score   = DeepFace emotion probabilities → (happy+surprise)×100 + neutral×50 / total
-gestural_score = gesture valence (−1..+1) mapped to 10..90
-                 raised_hand=+1.0, looking_forward=+0.7, writing=+0.8
-                 phone=−0.6, head_down=−0.7
+engagement = attention × 0.30
+           + VA_valence_score × 0.35
+           + positive_gesture_rate × 0.20
+           + posture_score × 0.15
 ```
 
-Classroom sentiment = average across all detected students → `Positive / Neutral / Negative`.
+### Classroom Object Detection — YOLO-World
 
-### Async Emotion Analysis
+**YOLO-World `yolov8s-worldv2.pt`** runs open-vocabulary detection without retraining. Configured classes: `mobile phone · laptop computer · book · pen · earphones`.
 
-`EmotionWorker` runs DeepFace in a background daemon thread. The display loop calls `worker.submit()` (fire-and-forget, silently dropped if a job is already running) and reads results via `worker.latest()` with no blocking. This keeps FPS stable even when DeepFace takes 0.5–2 s per analysis.
+Each detected object is associated to the nearest student bounding box. Objects are tagged in the UI as:
 
-### MOG2 Motion Detection
+| Tag | Objects |
+| --- | ------- |
+| ⚠ Distraction | mobile phone, earphones |
+| ✓ Engagement | book, pen |
+| — Neutral | laptop computer |
 
-Replaced raw `cv2.absdiff` (sensitive to lighting changes and RTSP compression noise) with `cv2.BackgroundSubtractorMOG2` (`history=500`, `varThreshold=25`). MOG2 models the background over a rolling window so static objects and gradual illumination shifts don't create false motion signals.
+Object scanning runs in an `ObjectWorker` async daemon thread (every N frames, configurable) so it never blocks the display loop.
+
+### Async Worker Architecture
+
+Both heavy operations run fire-and-forget in background daemon threads:
+
+| Worker | Task | Never-block guarantee |
+| ------ | ---- | --------------------- |
+| `EmotionWorker` | HSEmotion inference per face crop | `submit()` dropped if worker is busy |
+| `ObjectWorker` | YOLO-World object scan | `submit()` dropped if worker is busy |
+
+Results are pulled via `worker.latest()` — a lock-protected read that always returns instantly.
 
 ### Quick Start
 
@@ -148,19 +195,24 @@ pip install -r rydegate_requirements.txt
 streamlit run rydegate_classroom.py
 ```
 
-`yolov8n-pose.pt` is downloaded automatically by ultralytics on first run (~6 MB).
+Model weights are downloaded automatically by Ultralytics on first run:
 
-### RydeGate Panels
+- `yolo11n-pose.pt` (~6 MB)
+- `yolov8s-worldv2.pt` (~43 MB)
+
+### RydeGate UI Panels
 
 | Panel | Location | Content |
 | ----- | -------- | ------- |
 | Live emotion bars | Sidebar | 7-emotion progress bars, session totals |
 | Live gesture bars | Sidebar | 5-gesture breakdown, session totals |
-| Sentiment gauge | Sidebar + bottom | Blended score + Positive/Neutral/Negative label |
+| VA panel | Sidebar + bottom | Valence / arousal bars + classroom state badge |
+| Detected objects | Sidebar + bottom | Per-object distraction/engagement tag |
 | Pedagogical insight | Sidebar | Rule-based actionable note for the educator |
-| Student chips | Bottom row | Per-student `S1 HAPPY ✓ ✋` — emotion, attention tick, gesture icon |
-| Sentiment badge | Bounding box | Colour-coded percentage drawn directly on each student's box |
-| Motion heatmap | Video overlay | Subtle red MOG2 foreground mask overlay when motion > 15% |
+| Student chips | Bottom row | Per-student `S1 HAPPY ✓ ✋ PART 📱` — emotion, attention, gesture, state, objects |
+| Valence badge | Bounding box | `V+0.7` drawn directly on each student's box (colour-coded) |
+| Posture bar | Bounding box edge | Vertical fill bar — green when upright, amber when slumping |
+| Motion heatmap | Video overlay | Subtle red MOG2 foreground mask overlay when motion > 15 % |
 | Stream status | Top banner | `connecting / streaming / reconnecting` — never silent on failure |
 
 ---
@@ -169,7 +221,7 @@ streamlit run rydegate_classroom.py
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  Browser (React 18 + Vite + Tailwind v4)                         │
+│  Browser  (React 18 · Vite · Tailwind v4)                       │
 │  Dashboard · AlertLog · LiveEmotionPanel · EmotionTimelineChart  │
 │  EngagementChart · GestureBreakdown · SessionPanel · Reports     │
 └───────────────┬───────────────────────────┬─────────────────────┘
@@ -200,7 +252,7 @@ streamlit run rydegate_classroom.py
 ┌──────────┴───────────────┐
 │  Python FastAPI          │
 │  (Render.com)            │
-│  DeepFace MTCNN          │
+│  HSEmotion ONNX          │
 │  OpenCV HOG+SVM          │
 │  PDPA blur on faces      │
 │  /analyze/rtsp           │
@@ -210,27 +262,31 @@ streamlit run rydegate_classroom.py
 ── Standalone companion monitor ──────────────────────────────────
 
 ┌─────────────────────────────────────────────────────────────────┐
-│  RydeGate Classroom Intelligence  (rydegate_classroom.py)        │
-│  Streamlit UI — runs on any local machine / classroom PC         │
-│                                                                  │
-│  FrameBuffer (daemon thread)                                     │
-│   └── queue-backed, auto-reconnect RTSP / YouTube / file         │
-│                                                                  │
-│  YOLOv8-Pose inference (every 3rd frame)                         │
-│   └── bounding boxes + 17-keypoint skeleton                      │
-│   └── classify_gesture() → raised_hand / head_down / writing /  │
-│                             phone / looking_forward              │
-│                                                                  │
-│  EmotionWorker (async daemon thread)                             │
-│   └── DeepFace on head-crop per student                          │
-│   └── 7 emotions + attention heuristic + sentiment score         │
-│                                                                  │
-│  MOG2 background subtractor                                      │
-│   └── per-frame motion score 0–100                               │
-│                                                                  │
-│  Blended sentiment = facial×0.6 + gestural×0.4                   │
-│  Engagement = attention×0.6 + positive_emotion_rate×0.4          │
-│  Pedagogical insight (rule-based, no API call)                   │
+│  RydeGate Classroom Intelligence  (rydegate_classroom.py)  v3   │
+│  Streamlit UI — runs on any local machine / classroom PC        │
+│                                                                 │
+│  VLCCapture  (RTSP)   FrameBuffer  (file / webcam / YouTube)   │
+│   └── libvlc memory callbacks     └── queue-backed daemon      │
+│                                                                 │
+│  YOLOv11n-Pose  (every 3rd frame)                               │
+│   └── 17-keypoint skeleton → classify_gesture()                │
+│   └── compute_posture_score() from shoulder/hip lean angle     │
+│                                                                 │
+│  EmotionWorker  (async daemon thread)                           │
+│   └── HSEmotion enet_b2_8 on head-crop per student             │
+│   └── 8 emotions → Valence/Arousal (Russell circumplex)        │
+│   └── VA quadrant → classroom state                            │
+│                                                                 │
+│  ObjectWorker  (async daemon thread)                            │
+│   └── YOLO-World yolov8s-worldv2 — phone/laptop/book/pen       │
+│   └── associate_objects() — nearest-person assignment          │
+│                                                                 │
+│  MOG2 background subtractor → motion score 0–100               │
+│                                                                 │
+│  engagement = attention×0.30 + VA_valence×0.35                  │
+│             + gesture×0.20  + posture×0.15                      │
+│  sentiment  = VA_valence×0.60 + gestural_valence×0.40           │
+│  Pedagogical insight — rule-based, no API call                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -242,14 +298,14 @@ streamlit run rydegate_classroom.py
 
 | Layer | Technology |
 | ----- | ---------- |
-| Frontend | React 18, TypeScript, Vite, Tailwind CSS v4 (`@tailwindcss/vite`) |
+| Frontend | React 18, TypeScript, Vite, Tailwind CSS v4 |
 | Charts | Recharts (AreaChart, LineChart, BarChart, PieChart) |
 | Backend | Node.js, Express, TypeScript |
-| AI — scene | Google Gemini 2.0 Flash (`gemini-2.0-flash`) |
-| AI — faces | DeepFace (`mtcnn==0.1.1`) + OpenCV HOG+SVM |
+| AI — scene | Google Gemini 2.0 Flash |
+| AI — faces | HSEmotion (`enet_b2_8` ONNX) + OpenCV HOG+SVM |
 | Database | Supabase (PostgreSQL) |
-| Realtime | Server-Sent Events (SSE) via `broadcastToRoom()` |
-| Auth | API-key RBAC middleware (no OAuth required) |
+| Realtime | Server-Sent Events (SSE) |
+| Auth | API-key RBAC middleware |
 | Deployment | Netlify (frontend) · Render.com (backend + Python) |
 
 ### RydeGate Classroom Intelligence
@@ -257,14 +313,15 @@ streamlit run rydegate_classroom.py
 | Layer | Technology |
 | ----- | ---------- |
 | UI framework | Streamlit 1.35+ |
-| Object detection | YOLOv8-Nano Pose (`yolov8n-pose.pt`) via Ultralytics |
-| Emotion analysis | DeepFace (`opencv` backend, async daemon thread) |
+| Pose estimation | YOLOv11n-Pose (`yolo11n-pose.pt`) via Ultralytics |
+| Object detection | YOLO-World (`yolov8s-worldv2.pt`) — open-vocabulary |
+| Emotion engine | HSEmotion `enet_b2_8` (EfficientNet-B2, AffectNet-8, ONNX) |
+| Sentiment model | Russell circumplex VA — valence×0.60 + gestural×0.40 |
 | Motion detection | OpenCV MOG2 background subtractor |
-| Video sources | RTSP · YouTube (yt-dlp) · local file |
-| Stream capture | `FrameBuffer` — queue-backed, non-blocking, auto-reconnect |
+| RTSP capture | VLC libvlc memory-callback rendering (`python-vlc`) |
+| Other sources | `FrameBuffer` — queue-backed, auto-reconnect, yt-dlp |
 | Gesture engine | COCO 17-keypoint skeleton rule classifier |
-| Sentiment model | Facial × 0.6 + gestural valence × 0.4 |
-| Runtime | Python 3.10+, fully local — no cloud API required |
+| Runtime | Python 3.10+ · fully local · no cloud API |
 
 ---
 
@@ -315,7 +372,10 @@ EduSphere-Ai-/
 │
 ├── backend/supabase_schema.sql          # v1 — core tables
 ├── backend/supabase_schema_v2.sql       # v2 — audit_logs, consent_records, RLS
-└── backend/supabase_schema_v3.sql       # v3 — emotion_breakdown, pedagogical_note
+├── backend/supabase_schema_v3.sql       # v3 — emotion_breakdown, pedagogical_note
+│
+├── rydegate_classroom.py                # RydeGate standalone Streamlit app
+└── rydegate_requirements.txt           # Python dependencies for RydeGate
 ```
 
 ---
@@ -325,7 +385,7 @@ EduSphere-Ai-/
 ### Prerequisites
 
 - Node.js 20+
-- Python 3.10+ (for the DeepFace service)
+- Python 3.10+
 - A Supabase project
 - A Google Gemini API key
 
@@ -368,11 +428,11 @@ OPERATOR_KEY=your-operator-secret
 VIEWER_KEY=your-viewer-secret
 ```
 
-### 3 — Python DeepFace Service
+### 3 — Python Service
 
 ```bash
 cd deepface-service
-pip install fastapi uvicorn deepface mtcnn==0.1.1 opencv-python-headless
+pip install fastapi uvicorn hsemotion-onnx opencv-python-headless
 uvicorn main:app --port 8000
 ```
 
@@ -394,6 +454,15 @@ VITE_API_URL=http://localhost:3000/api
 ### 5 — Open the app
 
 Navigate to `http://localhost:5173`. In open mode (no `*_KEY` env vars set on the backend), the app auto-logs in with admin access — no password required.
+
+### 6 — RydeGate (standalone)
+
+```bash
+pip install -r rydegate_requirements.txt
+streamlit run rydegate_classroom.py
+```
+
+Model weights download automatically on first run (`yolo11n-pose.pt` ~6 MB, `yolov8s-worldv2.pt` ~43 MB).
 
 ---
 
@@ -448,12 +517,12 @@ Each analysis tick (every 15 seconds):
    └── RTSP         → Python cv2.VideoCapture server-side
 
 2. Parallel AI calls
-   ├── POST /analyze/gemini  → Gemini 2.0 Flash
+   ├── POST /analyze/gemini   → Gemini 2.0 Flash
    │     Returns: headcount, lecturer_present, engagement_score,
    │              gestures, classroom_sentiment, alert, pedagogical_note
-   └── POST /analyze/deepface → Python FastAPI + DeepFace MTCNN
+   └── POST /analyze/deepface → Python FastAPI + HSEmotion
          Returns: faces[], persons[], emotion_breakdown, attention_rate,
-                  dominant_class_emotion, frame_width, frame_height
+                  dominant_class_emotion, valence, arousal, va_state
 
 3. Merge results → applyAnalysis()
    └── Updates live UI + bounding-box canvas overlay
