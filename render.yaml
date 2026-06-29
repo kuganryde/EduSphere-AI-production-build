@@ -1,9 +1,10 @@
 services:
   - type: web
     name: edusphere-backend
-    runtime: docker
+    runtime: node
     rootDir: backend
-    dockerfilePath: ./Dockerfile
+    buildCommand: npm install && npm run build
+    startCommand: node dist/server.js
     plan: starter
     healthCheckPath: /api/health
     envVars:
@@ -22,8 +23,6 @@ services:
       - key: DEEPFACE_API_KEY
         sync: false
       - key: DEEPFACE_API_URL
-        sync: false
-      - key: TAILSCALE_AUTH_KEY
         sync: false
       - key: FRONTEND_URL
         value: https://eduspheredetection.netlify.app
