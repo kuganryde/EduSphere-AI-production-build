@@ -129,6 +129,7 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
   const [urlInput, setUrlInput]     = useState('');
   const [pendingType, setPendingType] = useState<SourceType | null>(null);
   const [rtspThumbnail, setRtspThumbnail] = useState<string | null>(null);
+  const [uploadSrc, setUploadSrc]   = useState<string | null>(null);
   const [liveData, setLiveData]     = useState<LiveData>({
     engagement: 0, headcount: 0, lecturerPresent: false, sentiment: '—',
     attentionRate: null, dominantEmotion: '—', latencyMs: null,
@@ -157,6 +158,7 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
     sseRef.current?.close(); sseRef.current = null;
     if (videoRef.current) { videoRef.current.pause(); videoRef.current.srcObject = null; videoRef.current.src = ''; }
     if (uploadObjRef.current) { URL.revokeObjectURL(uploadObjRef.current); uploadObjRef.current = null; }
+    setUploadSrc(null);
     setSource(null);
     setDetection({ faces: [], persons: [], frameWidth: 0, frameHeight: 0 });
 
@@ -171,12 +173,7 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
     } else if (triggerSource.type === 'upload' && triggerSource.file) {
       const objUrl = URL.createObjectURL(triggerSource.file);
       uploadObjRef.current = objUrl;
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-        videoRef.current.src = objUrl;
-        videoRef.current.loop = true;
-        videoRef.current.play().catch(() => {});
-      }
+      setUploadSrc(objUrl);
       setSource({ type: 'upload', fileName: triggerSource.file.name });
     }
   }, [triggerSource?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -396,14 +393,8 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
     if (uploadObjRef.current) URL.revokeObjectURL(uploadObjRef.current);
     const objUrl = URL.createObjectURL(file);
     uploadObjRef.current = objUrl;
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-      videoRef.current.src = objUrl;
-      videoRef.current.loop = true;
-      videoRef.current.play().catch(() => {});
-    }
+    setUploadSrc(objUrl);
     setSource({ type: 'upload', fileName: file.name });
-    // Reset input so same file can be reloaded
     e.target.value = '';
   }, []);
 
@@ -414,6 +405,7 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
     if (source?.type === 'rtsp') await stopRtspPolling();
     if (videoRef.current) { videoRef.current.pause(); videoRef.current.srcObject = null; videoRef.current.src = ''; }
     if (uploadObjRef.current) { URL.revokeObjectURL(uploadObjRef.current); uploadObjRef.current = null; }
+    setUploadSrc(null);
     setSource(null);
     setDetection({ faces: [], persons: [], frameWidth: 0, frameHeight: 0 });
     setLiveData(d => ({ ...d, analysing: false }));
@@ -532,7 +524,7 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
         {/* Uploaded video */}
         {source?.type === 'upload' && (
           <div className="flex-1 relative">
-            <video ref={videoRef} autoPlay playsInline muted loop className="w-full h-full object-contain" />
+            <video ref={videoRef} src={uploadSrc ?? undefined} autoPlay playsInline muted loop className="w-full h-full object-contain" />
             <div className="absolute bottom-4 left-4 px-2 py-1 bg-black/70 rounded text-[9px] text-purple-300 font-mono truncate max-w-[60%]">
               {source.fileName}
             </div>
