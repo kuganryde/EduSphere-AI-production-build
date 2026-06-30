@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense, useEffect } from 'react';
+import { useState, lazy, Suspense, useEffect, useCallback } from 'react';
 import { AnalysisUpdate } from './types';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
@@ -11,7 +11,7 @@ const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
 const ReportsPage   = lazy(() => import('./pages/ReportsPage'));
 const AuditLogPage  = lazy(() => import('./pages/AuditLogPage'));
 
-type Page = 'dashboard' | 'operator' | 'analytics' | 'reports' | 'audit';
+type Page = 'dashboard' | 'operator' | 'analytics' | 'reports' | 'audit' | 'syshealth' | 'alerts';
 
 const Spinner = () => (
   <div className="flex-1 flex items-center justify-center">
@@ -112,12 +112,14 @@ const PAGE_LABEL: Record<Page, string> = {
   analytics: 'Analytics',
   reports:   'Reports',
   audit:     'Audit Log',
+  syshealth: 'System Health',
+  alerts:    'Alert Center',
 };
 
 /* ── Sidebar section nav structure ───────────────────────────── */
 interface NavSection {
   sectionLabel: string;
-  items: { id: Page | 'camera' | 'alerts' | 'settings' | 'syshealth'; label: string; sub: string; perm?: string; Icon: () => JSX.Element; badge?: string; disabled?: boolean }[];
+  items: { id: string; label: string; sub: string; perm?: string; Icon: () => JSX.Element; badge?: string; disabled?: boolean; tab?: string }[];
 }
 
 /* ── Greeting helper ─────────────────────────────────────────── */
@@ -325,6 +327,161 @@ function TopNav({
   );
 }
 
+/* ── SystemHealthPage ────────────────────────────────────────── */
+function SystemHealthPage({ liveStats }: { liveStats: AnalysisUpdate | null }) {
+  const API_URL_SH = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+  const [health, setHealth] = useState<{ backend: any; sidecar: any } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [lastCheck, setLastCheck] = useState(new Date());
+
+  const checkHealth = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [backend, sidecar] = await Promise.allSettled([
+        fetch(`${API_URL_SH}/health`).then(r => r.json()),
+        fetch(`${API_URL_SH}/sidecar/health`).then(r => r.json()),
+      ]);
+      setHealth({
+        backend: backend.status === 'fulfilled' ? backend.value : { status: 'error' },
+        sidecar: sidecar.status === 'fulfilled' ? sidecar.value : { status: 'error' },
+      });
+    } catch {
+      setHealth({ backend: { status: 'error' }, sidecar: { status: 'error' } });
+    } finally {
+      setLoading(false);
+      setLastCheck(new Date());
+    }
+  }, [API_URL_SH]);
+
+  useEffect(() => { checkHealth(); }, [checkHealth]);
+
+  return (
+    <div className="flex flex-col h-full p-6 thin-scroll" style={{ background: 'var(--surface-0)', overflowY: 'auto' }}>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-0)' }}>System Health</h2>
+          <p style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>Last checked {lastCheck.toLocaleTimeString()}</p>
+        </div>
+        <button onClick={checkHealth} disabled={loading}
+          className="px-4 py-2 rounded-xl text-xs font-bold"
+          style={{ background: 'var(--brand)', color: '#fff', opacity: loading ? 0.6 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}>
+          {loading ? 'Checking…' : 'Refresh'}
+        </button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 16, marginBottom: 24 }}>
+        {[
+          { label: 'Backend API',   ok: health?.backend?.status !== 'error',  detail: health?.backend?.uptime ? `${Math.round(health.backend.uptime / 60)}m uptime` : '—' },
+          { label: 'AI Sidecar',   ok: health?.sidecar?.status !== 'error',  detail: health?.sidecar?.model ?? '—' },
+          { label: 'Live Feed',    ok: !!liveStats,                            detail: liveStats ? 'Feed active' : 'No active feed' },
+          { label: 'Database',     ok: health?.backend?.db !== false,          detail: 'Supabase · ap-southeast-1' },
+        ].map(s => (
+          <div key={s.label} className="e-card" style={{ padding: '16px 20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-0)' }}>{s.label}</span>
+              <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                background: s.ok ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+                color: s.ok ? '#10b981' : '#ef4444',
+                border: `1px solid ${s.ok ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}` }}>
+                {s.ok ? '● HEALTHY' : '● ERROR'}
+              </span>
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--text-3)' }}>{s.detail}</p>
+          </div>
+        ))}
+      </div>
+      <div className="e-card" style={{ padding: 20 }}>
+        <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-2)', marginBottom: 12 }}>PLATFORM INFO</p>
+        {([
+          ['Version',         'v2.2.0 University Edition'],
+          ['Build',           'Production'],
+          ['Compliance',      'PDPA / Data Protection Compliant'],
+          ['AI Models',       'YOLOv11n-pose · HSEmotion · Gemini 2.0 Flash'],
+          ['Frame Intervals', '1.5s webcam · 2.0s video · 4.0s RTSP'],
+          ['DB Region',       'ap-southeast-1 (Singapore)'],
+        ] as [string, string][]).map(([k, v]) => (
+          <div key={k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-0)' }}>
+            <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{k}</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-1)', fontFamily: 'JetBrains Mono' }}>{v}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── AlertsPage ──────────────────────────────────────────────── */
+function AlertsPage({
+  alerts, onClear,
+}: {
+  alerts: { type: string; timestamp: string; message: string | null }[];
+  onClear: () => void;
+}) {
+  const getSev = (type: string) => {
+    if (type.includes('absent') || type.includes('danger')) return 'high';
+    if (type.includes('low') || type.includes('distract')) return 'medium';
+    return 'low';
+  };
+  const SEV_COLOR: Record<string, string> = { high: '#ef4444', medium: '#f59e0b', low: '#3b82f6' };
+
+  return (
+    <div className="flex flex-col h-full p-6 thin-scroll" style={{ background: 'var(--surface-0)', overflowY: 'auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+        <div>
+          <h2 style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-0)' }}>Alert Center</h2>
+          <p style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
+            {alerts.length} alert{alerts.length !== 1 ? 's' : ''} recorded this session
+          </p>
+        </div>
+        {alerts.length > 0 && (
+          <button onClick={onClear}
+            style={{ padding: '6px 16px', borderRadius: 12, fontSize: 11, fontWeight: 700,
+              background: 'rgba(239,68,68,0.12)', color: '#f87171', border: '1px solid rgba(239,68,68,0.25)', cursor: 'pointer' }}>
+            Clear All
+          </button>
+        )}
+      </div>
+      {alerts.length === 0 ? (
+        <div className="e-card" style={{ padding: 48, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <span style={{ fontSize: 36, marginBottom: 12 }}>✅</span>
+          <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>No alerts this session</p>
+          <p style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>AI alerts appear here automatically</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {[...alerts].reverse().map((alert, i) => {
+            const sev = getSev(alert.type ?? '');
+            const color = SEV_COLOR[sev];
+            return (
+              <div key={i} className="e-card" style={{ padding: '12px 16px', borderLeft: `3px solid ${color}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 18 }}>{sev === 'high' ? '🚨' : sev === 'medium' ? '⚠️' : 'ℹ️'}</span>
+                    <div>
+                      <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-0)', textTransform: 'capitalize' }}>
+                        {alert.type.replace(/_/g, ' ')}
+                      </p>
+                      {alert.message && <p style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>{alert.message}</p>}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                      background: `${color}18`, color, border: `1px solid ${color}30` }}>
+                      {sev.toUpperCase()}
+                    </span>
+                    <span style={{ fontSize: 10, color: 'var(--text-3)', fontFamily: 'JetBrains Mono' }}>
+                      {new Date(alert.timestamp).toLocaleTimeString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── AppShell ────────────────────────────────────────────────── */
 function AppShell() {
   const { isAuthenticated, role, logout, can, openMode } = useAuth();
@@ -332,13 +489,20 @@ function AppShell() {
   const [page, setPage]           = useState<Page>('dashboard');
   const [liveStats, setLiveStats] = useState<AnalysisUpdate | null>(null);
   const [alertCount, setAlertCount] = useState(0);
+  const [analyticsTab, setAnalyticsTab] = useState<'classroom' | 'student' | 'lecturer' | 'ai'>('classroom');
+  const [sessionAlerts, setSessionAlerts] = useState<{type:string; timestamp:string; message:string|null}[]>([]);
 
-  // Count alerts from live stats
-  useEffect(() => {
-    if (liveStats?.alert) {
+  const handleLiveStats = useCallback((update: AnalysisUpdate) => {
+    setLiveStats(update);
+    if (update.alert) {
+      setSessionAlerts(prev => [...prev.slice(-49), {
+        type: update.alert!,
+        timestamp: update.timestamp,
+        message: update.pedagogicalNote ?? null,
+      }]);
       setAlertCount(c => c + 1);
     }
-  }, [liveStats?.alert]);
+  }, []);
 
   if (!isAuthenticated) return <LoginModal />;
 
@@ -357,43 +521,38 @@ function AppShell() {
     {
       sectionLabel: 'MONITORING',
       items: [
-        { id: 'dashboard', label: 'Dashboard',      sub: 'Live overview',    Icon: IconDashboard },
-        { id: 'operator',  label: 'Live Monitoring', sub: 'Operator display', perm: 'operator_mode', Icon: IconMonitor },
-        { id: 'camera',    label: 'Camera Manager', sub: 'Source control',   Icon: IconCamera },
+        { id: 'dashboard', label: 'Live Dashboard',   sub: 'Real-time overview',  Icon: IconDashboard },
+        { id: 'operator',  label: 'Operator Display', sub: 'Full-screen mode',    perm: 'operator_mode', Icon: IconMonitor },
       ],
     },
     {
       sectionLabel: 'ANALYTICS',
       items: [
-        { id: 'analytics', label: 'Student Analytics',   sub: 'Individual data',   perm: 'view_analytics', Icon: IconUsers },
-        { id: 'analytics', label: 'Lecturer Analytics',  sub: 'Lecturer insights', perm: 'view_analytics', Icon: IconBarChart },
-        { id: 'analytics', label: 'Classroom Analytics', sub: 'Room-level data',   perm: 'view_analytics', Icon: IconBarChart },
-        { id: 'analytics', label: 'AI Insights',         sub: 'Smart analysis',    perm: 'view_analytics', Icon: IconBarChart },
+        { id: 'analytics', label: 'Classroom',        sub: 'Room-level data',     perm: 'view_analytics', Icon: IconBarChart, tab: 'classroom' },
+        { id: 'analytics', label: 'Student Emotions', sub: 'Individual analysis', perm: 'view_analytics', Icon: IconUsers,    tab: 'student'   },
+        { id: 'analytics', label: 'Lecturer',         sub: 'Presence & pedagogy', perm: 'view_analytics', Icon: IconBarChart, tab: 'lecturer'  },
+        { id: 'analytics', label: 'AI Insights',      sub: 'Smart observations',  perm: 'view_analytics', Icon: IconBarChart, tab: 'ai'        },
       ],
     },
     {
-      sectionLabel: 'MANAGEMENT',
+      sectionLabel: 'REPORTS',
       items: [
-        { id: 'reports',  label: 'Session Management', sub: 'Active sessions',  perm: 'view_reports',   Icon: IconDoc },
-        { id: 'reports',  label: 'Reports & Export',   sub: 'Download data',    perm: 'view_reports',   Icon: IconDoc },
-        { id: 'alerts',   label: 'Alert Center',       sub: 'Active alerts',    Icon: IconBell,         badge: alertCount > 0 ? String(alertCount > 9 ? '9+' : alertCount) : undefined },
+        { id: 'reports', label: 'Sessions',     sub: 'History & export',  perm: 'view_reports', Icon: IconDoc  },
+        { id: 'alerts',  label: 'Alert Center', sub: 'All alerts',        Icon: IconBell, badge: alertCount > 0 ? String(alertCount > 9 ? '9+' : alertCount) : undefined },
       ],
     },
     {
       sectionLabel: 'SYSTEM',
       items: [
         { id: 'syshealth', label: 'System Health', sub: liveStats ? 'HEALTHY' : 'IDLE', Icon: IconCpu },
-        { id: 'settings',  label: 'Settings',      sub: 'Coming soon', Icon: IconGear, disabled: true },
-        { id: 'audit',     label: 'Users & Roles', sub: 'Access control', perm: 'view_audit_logs', Icon: IconUsers },
-        { id: 'audit',     label: 'Audit Logs',    sub: 'Activity log',   perm: 'view_audit_logs', Icon: IconAudit },
+        { id: 'audit',     label: 'Audit Logs',    sub: 'Activity log',  perm: 'view_audit_logs', Icon: IconAudit },
+        { id: 'settings',  label: 'Settings',      sub: 'Coming soon',   Icon: IconGear, disabled: true },
       ],
     },
   ];
 
   // Map sidebar IDs to actual pages
   const resolveId = (id: string): Page => {
-    if (id === 'camera' || id === 'alerts') return 'dashboard';
-    if (id === 'syshealth') return 'dashboard';
     if (id === 'settings') return 'dashboard';
     return id as Page;
   };
@@ -460,11 +619,17 @@ function AppShell() {
                       </div>
                     );
                   }
-                  const active = page === resolveId(item.id) && item.id !== 'camera' && item.id !== 'alerts' && item.id !== 'syshealth';
+                  const active = page === resolveId(item.id)
+                    && (!item.tab || analyticsTab === item.tab);
                   return (
                     <button
                       key={`${item.id}-${idx}`}
-                      onClick={() => !item.disabled && setPage(resolveId(item.id))}
+                      onClick={() => {
+                        if (!item.disabled) {
+                          if (item.tab) setAnalyticsTab(item.tab as 'classroom' | 'student' | 'lecturer' | 'ai');
+                          setPage(resolveId(item.id));
+                        }
+                      }}
                       title={item.label}
                       className={`s-item w-full text-left${active ? ' active' : ''}`}
                     >
@@ -560,13 +725,15 @@ function AppShell() {
 
         {/* ── Main Content ──────────────────────────────────────── */}
         <main className="flex-1 overflow-auto min-w-0" style={{ background: 'var(--surface-0)' }}>
+          {page === 'syshealth' && <SystemHealthPage liveStats={liveStats} />}
+          {page === 'alerts'    && <AlertsPage alerts={sessionAlerts} onClear={() => { setSessionAlerts([]); setAlertCount(0); }} />}
           <Suspense fallback={
             <div className="flex items-center justify-center h-full">
               <Spinner />
             </div>
           }>
-            {page === 'dashboard'  && <Dashboard onLiveStats={setLiveStats} />}
-            {page === 'analytics'  && <AnalyticsPage />}
+            {page === 'dashboard'  && <Dashboard onLiveStats={handleLiveStats} />}
+            {page === 'analytics'  && <AnalyticsPage tab={analyticsTab} />}
             {page === 'reports'    && <ReportsPage />}
             {page === 'audit'      && <AuditLogPage />}
           </Suspense>

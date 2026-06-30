@@ -3,8 +3,8 @@ import { AnalysisUpdate, DetectedFace, DetectedPerson } from '../types';
 import { getAuthHeader } from '../context/AuthContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-const WEBCAM_INTERVAL_MS  = 3_000;   // local — DeepFace only cycles complete in ~1.5 s
-const UPLOAD_INTERVAL_MS  = 4_000;   // video file
+const WEBCAM_INTERVAL_MS  = 1_500;   // local — DeepFace only cycles complete in ~1.5 s
+const UPLOAD_INTERVAL_MS  = 2_000;   // video file
 const GEMINI_EVERY_N      = 3;       // run Gemini every Nth cycle; others use cached result
 
 type SourceType = 'webcam' | 'youtube' | 'rtsp' | 'upload';
@@ -150,6 +150,7 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
   const uploadObjRef    = useRef<string | null>(null);
   const cycleRef        = useRef<number>(0);            // analysis cycle counter
   const lastGeminiRef   = useRef<any>(null);            // cached Gemini result between staggered calls
+  const isAnalysingRef  = useRef(false);
 
   // ── External trigger from Dashboard camera strip ──────────────
   useEffect(() => {
@@ -298,42 +299,49 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL('image/jpeg', 0.82).split(',')[1];
+    return canvas.toDataURL('image/jpeg', 0.78).split(',')[1];
   }, []);
 
   const runWebcamAnalysis = useCallback(async () => {
-    const frame = captureFrame(640); // 640 px wide — fast upload, sufficient for face detection
-    if (!frame) return;
+    if (isAnalysingRef.current) return;
+    isAnalysingRef.current = true;
 
-    cycleRef.current += 1;
-    const runGemini = cycleRef.current % GEMINI_EVERY_N === 0;
+    try {
+      const frame = captureFrame(480); // 480 px wide — fast upload, sufficient for face detection
+      if (!frame) return;
 
-    setLiveData(d => ({ ...d, error: null }));
-    const start = Date.now();
+      cycleRef.current += 1;
+      const runGemini = cycleRef.current % GEMINI_EVERY_N === 0;
 
-    const [deepfaceRes, geminiRes] = await Promise.allSettled([
-      fetch(`${API_URL}/analyze/deepface`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_b64: frame, session_id: sessionId ?? 'none', room_id: id }),
-      }).then(r => r.json()),
-      runGemini
-        ? fetch(`${API_URL}/analyze/gemini`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ image: frame, room_id: id, session_id: sessionId ?? null }),
-          }).then(r => r.json())
-        : Promise.resolve(lastGeminiRef.current), // reuse cached result on non-Gemini cycles
-    ]);
+      setLiveData(d => ({ ...d, error: null }));
+      const start = Date.now();
 
-    // Update Gemini cache when a fresh result arrives
-    if (runGemini && geminiRes.status === 'fulfilled' && geminiRes.value) {
-      lastGeminiRef.current = geminiRes.value;
+      const [deepfaceRes, geminiRes] = await Promise.allSettled([
+        fetch(`${API_URL}/analyze/deepface`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image_b64: frame, session_id: sessionId ?? 'none', room_id: id }),
+        }).then(r => r.json()),
+        runGemini
+          ? fetch(`${API_URL}/analyze/gemini`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ image: frame, room_id: id, session_id: sessionId ?? null }),
+            }).then(r => r.json())
+          : Promise.resolve(lastGeminiRef.current), // reuse cached result on non-Gemini cycles
+      ]);
+
+      // Update Gemini cache when a fresh result arrives
+      if (runGemini && geminiRes.status === 'fulfilled' && geminiRes.value) {
+        lastGeminiRef.current = geminiRes.value;
+      }
+
+      applyAnalysis(
+        geminiRes.status === 'fulfilled' ? geminiRes.value : lastGeminiRef.current,
+        deepfaceRes.status === 'fulfilled' ? deepfaceRes.value : null,
+        Date.now() - start,
+      );
+    } finally {
+      isAnalysingRef.current = false;
     }
-
-    applyAnalysis(
-      geminiRes.status === 'fulfilled' ? geminiRes.value : lastGeminiRef.current,
-      deepfaceRes.status === 'fulfilled' ? deepfaceRes.value : null,
-      Date.now() - start,
-    );
   }, [captureFrame, id, sessionId, applyAnalysis]);
 
   // ── RTSP: start server-side polling + subscribe to SSE ────────────────────────
