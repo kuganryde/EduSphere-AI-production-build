@@ -267,16 +267,21 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
         audio: false,
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
+      // setSource first — video element mounts, then useEffect below attaches stream
       setSource({ type: 'webcam' });
       setShowModal(false);
     } catch (err: any) {
       alert(`Camera access denied: ${err.message}`);
     }
   }, []);
+
+  // Attach webcam stream to video element after it mounts
+  useEffect(() => {
+    if (source?.type === 'webcam' && streamRef.current && videoRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [source]);
 
   const captureFrame = useCallback((): string | null => {
     const video = videoRef.current;
