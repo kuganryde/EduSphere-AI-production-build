@@ -9,7 +9,11 @@ router.get("/", async (_req, res) => {
     .from("students")
     .select("id, student_id, name, face_b64, created_at")
     .order("created_at", { ascending: false });
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) {
+    console.error("students GET error:", error.message);
+    // Return empty list rather than 500 so the page renders while table is being set up
+    return res.json([]);
+  }
   res.json(data ?? []);
 });
 
