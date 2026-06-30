@@ -24,6 +24,7 @@ export interface TriggerSource {
 const ROOM_ID       = 'room-402-b';
 const ROOM_CAPACITY = 34;
 const MAX_HISTORY   = 50;
+const MAX_PANEL_ALERTS = 5;
 
 function formatElapsed(startedAt: string): string {
   const diff = Date.now() - new Date(startedAt).getTime();
@@ -31,6 +32,15 @@ function formatElapsed(startedAt: string): string {
   const m = Math.floor((diff % 3600000) / 60000);
   const s = Math.floor((diff % 60000) / 1000);
   return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  return `${Math.floor(m / 60)}h ago`;
 }
 
 const INITIAL_SLOTS: CameraSlot[] = [
@@ -78,7 +88,7 @@ function buildInsights(stats: Omit<AnalysisUpdate, 'timestamp'>): { icon: string
     items.push({ icon: '↓', text: `Low engagement at ${stats.engagement}% — consider re-engaging`, color: 'var(--warning)' });
 
   if (stats.headcount > 0)
-    items.push({ icon: '👥', text: `${stats.headcount} of ${ROOM_CAPACITY} seats occupied`, color: 'var(--brand)' });
+    items.push({ icon: '◎', text: `${stats.headcount} of ${ROOM_CAPACITY} seats occupied`, color: 'var(--brand)' });
 
   if (stats.lecturerPresent)
     items.push({ icon: '✓', text: 'Lecturer actively present', color: 'var(--success)' });
@@ -86,7 +96,7 @@ function buildInsights(stats: Omit<AnalysisUpdate, 'timestamp'>): { icon: string
     items.push({ icon: '⚠', text: 'Lecturer not detected', color: 'var(--warning)' });
 
   if (stats.dominantEmotion && stats.dominantEmotion !== 'neutral')
-    items.push({ icon: '◎', text: `Dominant emotion: ${stats.dominantEmotion}`, color: 'var(--cyan)' });
+    items.push({ icon: '◉', text: `Dominant emotion: ${stats.dominantEmotion}`, color: 'var(--cyan)' });
 
   if (stats.sentiment && stats.sentiment !== '—')
     items.push({ icon: '◈', text: `Class sentiment: ${stats.sentiment}`, color: stats.sentiment === 'Positive' ? 'var(--success)' : stats.sentiment === 'Negative' ? 'var(--danger)' : 'var(--text-1)' });
@@ -97,9 +107,180 @@ function buildInsights(stats: Omit<AnalysisUpdate, 'timestamp'>): { icon: string
     items.push({ icon: '!', text: 'Below-capacity attendance', color: 'var(--warning)' });
 
   if (stats.pedagogicalNote)
-    items.push({ icon: '💡', text: stats.pedagogicalNote, color: '#a78bfa' });
+    items.push({ icon: '◆', text: stats.pedagogicalNote, color: '#a78bfa' });
 
   return items.length ? items : [{ icon: '✓', text: 'Session running nominally', color: 'var(--success)' }];
+}
+
+/* ── Emotion color map ──────────────────────────────────────── */
+const EMOTION_COLORS: Record<string, string> = {
+  happy:    '#10b981',
+  neutral:  '#60a5fa',
+  sad:      '#6366f1',
+  angry:    '#ef4444',
+  fear:     '#f59e0b',
+  surprise: '#22d3ee',
+  disgust:  '#a78bfa',
+};
+
+/* ── Right Analytics Panel ──────────────────────────────────── */
+interface PanelAlert {
+  id: string;
+  message: string;
+  level: 'warn' | 'danger' | 'info';
+  time: string;
+}
+
+interface RightPanelProps {
+  stats: Omit<AnalysisUpdate, 'timestamp'>;
+  isLive: boolean;
+  panelAlerts: PanelAlert[];
+  lastUpdated: string;
+}
+
+function RightAnalyticsPanel({ stats, isLive, panelAlerts, lastUpdated }: RightPanelProps) {
+  const insights = buildInsights(stats);
+
+  const latencyVal = 1200; // placeholder latency
+  const latencyColor = latencyVal < 2000 ? '#10b981' : latencyVal < 4000 ? '#f59e0b' : '#ef4444';
+
+  const emotionEntries = stats.emotionBreakdown
+    ? Object.entries(stats.emotionBreakdown).sort((a, b) => b[1] - a[1])
+    : [];
+
+  return (
+    <div
+      className="flex flex-col gap-0 overflow-y-auto thin-scroll shrink-0"
+      style={{ width: 300, background: 'var(--surface-1)', borderLeft: '1px solid var(--border-0)' }}
+    >
+      {/* Header */}
+      <div className="px-4 py-3 shrink-0" style={{ borderBottom: '1px solid var(--border-0)', background: 'var(--surface-2)' }}>
+        <div className="flex items-center gap-2">
+          <div className="w-1 h-4 rounded-full" style={{ background: 'linear-gradient(180deg,#a78bfa,#6366f1)' }} />
+          <span className="text-[10px] font-black uppercase tracking-[0.16em]" style={{ color: 'rgba(255,255,255,0.45)' }}>
+            Analytics Panel
+          </span>
+          <div className="ml-auto w-1.5 h-1.5 rounded-full neon-pulse"
+               style={{ background: isLive ? 'var(--success)' : 'var(--text-3)', boxShadow: isLive ? '0 0 6px var(--success)' : 'none' }} />
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-0 overflow-y-auto thin-scroll flex-1">
+        {/* ── Section 1: AI Insights ────────────────────────────── */}
+        <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--border-0)' }}>
+          <div className="section-header-ent">
+            <span className="w-1.5 h-1.5 rounded-full neon-pulse" style={{ background: '#a78bfa', boxShadow: '0 0 6px rgba(167,139,250,0.6)' }} />
+            AI INSIGHTS
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {insights.slice(0, 5).map((ins, i) => (
+              <div key={i} className="flex items-start gap-2 py-1">
+                <span className="text-[11px] font-bold shrink-0 mt-0.5" style={{ color: ins.color, width: 14, textAlign: 'center' }}>{ins.icon}</span>
+                <span className="text-[11px] leading-snug" style={{ color: 'rgba(255,255,255,0.65)' }}>{ins.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Section 2: Emotion Distribution ──────────────────── */}
+        <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--border-0)' }}>
+          <div className="section-header-ent">
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#22d3ee' }} />
+            EMOTION BREAKDOWN
+          </div>
+          {emotionEntries.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              {emotionEntries.map(([emotion, pct]) => (
+                <div key={emotion}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-semibold capitalize" style={{ color: EMOTION_COLORS[emotion] ?? 'var(--text-1)' }}>
+                      {emotion}
+                    </span>
+                    <span className="text-[10px] font-bold font-mono" style={{ color: EMOTION_COLORS[emotion] ?? 'var(--text-1)' }}>
+                      {pct.toFixed(0)}%
+                    </span>
+                  </div>
+                  <div className="prog-bar">
+                    <div className="prog-bar-fill" style={{ width: `${Math.min(pct, 100)}%`, background: EMOTION_COLORS[emotion] ?? 'var(--brand)' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {['happy','neutral','sad','angry','fear','surprise'].map(em => (
+                <div key={em}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-semibold capitalize" style={{ color: 'rgba(255,255,255,0.2)' }}>{em}</span>
+                    <span className="text-[10px] font-bold font-mono" style={{ color: 'rgba(255,255,255,0.2)' }}>—</span>
+                  </div>
+                  <div className="skeleton" style={{ height: 4, borderRadius: 2 }} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── Section 3: System Metrics ────────────────────────── */}
+        <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--border-0)' }}>
+          <div className="section-header-ent">
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#3b82f6' }} />
+            SYSTEM METRICS
+          </div>
+          <div className="flex flex-col">
+            {[
+              { label: 'AI Latency',       val: isLive ? `${latencyVal}ms` : '—',    color: isLive ? latencyColor : 'var(--text-3)' },
+              { label: 'Analysis Rate',    val: isLive ? 'every 2s' : '—',           color: isLive ? 'var(--text-1)' : 'var(--text-3)' },
+              { label: 'Faces Detected',   val: isLive ? String(stats.headcount) : '—', color: isLive ? 'var(--brand)' : 'var(--text-3)' },
+              { label: 'Attention Rate',   val: stats.attentionRate != null ? `${stats.attentionRate}%` : '—', color: stats.attentionRate != null ? (stats.attentionRate > 70 ? '#10b981' : stats.attentionRate > 40 ? '#f59e0b' : '#ef4444') : 'var(--text-3)' },
+              { label: 'Dominant Emotion', val: stats.dominantEmotion ?? '—',         color: stats.dominantEmotion ? (EMOTION_COLORS[stats.dominantEmotion] ?? 'var(--text-1)') : 'var(--text-3)' },
+              { label: 'Last Updated',     val: lastUpdated || '—',                   color: 'var(--text-2)' },
+            ].map(row => (
+              <div key={row.label} className="metric-row">
+                <span style={{ color: 'rgba(255,255,255,0.40)', fontSize: 10 }}>{row.label}</span>
+                <span className="font-mono text-[11px] font-semibold" style={{ color: row.color }}>{row.val}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Section 4: Recent Alerts ─────────────────────────── */}
+        <div className="px-4 py-3">
+          <div className="section-header-ent">
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#ef4444' }} />
+            RECENT ALERTS
+            {panelAlerts.length > 0 && (
+              <span className="ml-auto text-[8px] font-bold px-1.5 py-0.5 rounded-full"
+                    style={{ background: 'rgba(239,68,68,0.18)', color: '#f87171', border: '1px solid rgba(239,68,68,0.30)' }}>
+                {panelAlerts.length}
+              </span>
+            )}
+          </div>
+          {panelAlerts.length === 0 ? (
+            <div className="flex items-center gap-2 py-2">
+              <span className="text-[10px] font-bold" style={{ color: '#10b981' }}>✓</span>
+              <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.35)' }}>No active alerts</span>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {panelAlerts.map(alert => (
+                <div key={alert.id} className="alert-item">
+                  <span className="text-[11px] font-bold shrink-0 mt-0.5"
+                        style={{ color: alert.level === 'danger' ? '#f87171' : alert.level === 'warn' ? '#fbbf24' : '#60a5fa' }}>
+                    {alert.level === 'danger' ? '!' : alert.level === 'warn' ? '⚠' : '●'}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] leading-snug truncate" style={{ color: 'rgba(255,255,255,0.65)' }}>{alert.message}</p>
+                    <p className="text-[9px] font-mono mt-0.5" style={{ color: 'rgba(255,255,255,0.25)' }}>{timeAgo(alert.time)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 interface DashboardProps { onLiveStats?: (update: AnalysisUpdate) => void; }
@@ -121,7 +302,10 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
   const [demoAlerts, setDemoAlerts]     = useState<AlertRecord[]>([]);
   const prevDemoAlert                   = useRef<string | null>(null);
 
-  // Auto-start mock session when demo mode activates
+  // Panel alerts collected from live feed
+  const [panelAlerts, setPanelAlerts]   = useState<PanelAlert[]>([]);
+  const [lastUpdated, setLastUpdated]   = useState('');
+
   useEffect(() => {
     if (isDemoMode) {
       setMockSession(buildMockSession());
@@ -132,7 +316,6 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
     }
   }, [isDemoMode]);
 
-  // Wire mock stream → same handleStatsUpdate pipeline
   useMockStream(isDemoMode, (tick) => {
     handleStatsUpdate(tick.update);
     const alertType = tick.update.alert;
@@ -175,6 +358,8 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
       faceEmotions: update.faceEmotions ?? [] });
     if (update.gestures) setLastGestures(update.gestures);
     const t = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const ts = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    setLastUpdated(ts);
     setEngHistory(prev => [...prev.slice(-(MAX_HISTORY - 1)),
       { time: t, focus: update.engagement, attention: update.attentionRate ?? update.engagement }]);
     setLiveEmotionData({ emotionBreakdown: update.emotionBreakdown ?? null,
@@ -188,6 +373,22 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
         engagement: update.engagement, attention: update.attentionRate ?? update.engagement,
         sentiment: update.sentiment,
       }]);
+    }
+    // Collect panel alerts
+    if (update.alert) {
+      setPanelAlerts(prev => {
+        const newAlert: PanelAlert = {
+          id: `${Date.now()}-${update.alert}`,
+          message: update.alert === 'high_distraction'
+            ? 'High distraction detected — class needs re-engagement'
+            : update.alert === 'low_attendance'
+              ? 'Below-capacity attendance detected'
+              : update.alert ?? 'Alert triggered',
+          level: update.alert === 'high_distraction' ? 'danger' : 'warn',
+          time: new Date().toISOString(),
+        };
+        return [newAlert, ...prev].slice(0, MAX_PANEL_ALERTS);
+      });
     }
     onLiveStats?.(update);
   }, [onLiveStats]);
@@ -242,7 +443,6 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
     setSlots(prev => prev.filter(s => s.key !== key));
   };
 
-  // Active session: demo session takes precedence when in demo mode
   const activeSession  = isDemoMode ? mockSession : currentSession;
   const sessionDuration = activeSession ? formatElapsed(activeSession.started_at) : undefined;
   const isLive         = isDemoMode || !!activeSlotKey;
@@ -253,24 +453,8 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
   /* ── KPI definitions ──────────────────────────────────────── */
   const kpis = [
     {
-      label: 'Engagement',
-      value: stats.engagement ? `${stats.engagement}%` : '—',
-      color: engColor,
-      accent: stats.engagement > 79 ? 'linear-gradient(90deg,#10b981,#06b6d4)' : stats.engagement > 49 ? 'linear-gradient(90deg,#f59e0b,#fb923c)' : stats.engagement > 0 ? 'linear-gradient(90deg,#ef4444,#f97316)' : 'linear-gradient(90deg,#1e3a5f,#1e3a5f)',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
-            d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-      ),
-      sub: stats.engagement > 0 ? (stats.engagement > 70 ? 'Strong signal' : stats.engagement > 40 ? 'Moderate' : 'Low signal') : 'No feed active',
-      bar: stats.engagement,
-    },
-    {
-      label: 'Headcount',
-      value: stats.headcount ? `${stats.headcount}` : '—',
-      color: 'var(--brand)',
-      accent: 'linear-gradient(90deg,#3b82f6,#6366f1)',
+      label: 'Students', value: stats.headcount ? `${stats.headcount}` : '—',
+      color: 'var(--brand)', accent: 'linear-gradient(90deg,#3b82f6,#6366f1)',
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
@@ -279,6 +463,20 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
       ),
       sub: stats.headcount ? `of ${ROOM_CAPACITY} capacity` : 'No feed active',
       bar: stats.headcount ? Math.round(stats.headcount / ROOM_CAPACITY * 100) : 0,
+    },
+    {
+      label: 'Lecturer',
+      value: stats.headcount > 0 ? (stats.lecturerPresent ? 'Present' : 'Absent') : '—',
+      color: stats.headcount > 0 ? (stats.lecturerPresent ? 'var(--success)' : 'var(--warning)') : 'var(--text-3)',
+      accent: stats.headcount > 0 ? (stats.lecturerPresent ? 'linear-gradient(90deg,#10b981,#059669)' : 'linear-gradient(90deg,#f59e0b,#d97706)') : 'linear-gradient(90deg,#1e3a5f,#1e3a5f)',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+      ),
+      sub: 'Supervisor presence',
+      bar: stats.lecturerPresent ? 100 : 0,
     },
     {
       label: 'Attention',
@@ -295,6 +493,19 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
       bar: stats.attentionRate ?? 0,
     },
     {
+      label: 'Engagement',
+      value: stats.engagement ? `${stats.engagement}%` : '—',
+      color: engColor,
+      accent: stats.engagement > 79 ? 'linear-gradient(90deg,#10b981,#06b6d4)' : stats.engagement > 49 ? 'linear-gradient(90deg,#f59e0b,#fb923c)' : stats.engagement > 0 ? 'linear-gradient(90deg,#ef4444,#f97316)' : 'linear-gradient(90deg,#1e3a5f,#1e3a5f)',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+      ),
+      sub: stats.engagement > 0 ? (stats.engagement > 70 ? 'Strong signal' : stats.engagement > 40 ? 'Moderate' : 'Low signal') : 'No feed active',
+      bar: stats.engagement,
+    },
+    {
       label: 'Sentiment',
       value: stats.sentiment,
       color: stats.sentiment === 'Positive' ? 'var(--success)' : stats.sentiment === 'Negative' ? 'var(--danger)' : stats.sentiment !== '—' ? 'var(--text-1)' : 'var(--text-3)',
@@ -307,20 +518,6 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
       ),
       sub: stats.dominantEmotion ? `Dominant: ${stats.dominantEmotion}` : 'Class mood',
       bar: stats.sentiment === 'Positive' ? 80 : stats.sentiment === 'Negative' ? 20 : stats.sentiment !== '—' ? 50 : 0,
-    },
-    {
-      label: 'Lecturer',
-      value: stats.headcount > 0 ? (stats.lecturerPresent ? 'Present' : 'Absent') : '—',
-      color: stats.headcount > 0 ? (stats.lecturerPresent ? 'var(--success)' : 'var(--warning)') : 'var(--text-3)',
-      accent: stats.headcount > 0 ? (stats.lecturerPresent ? 'linear-gradient(90deg,#10b981,#059669)' : 'linear-gradient(90deg,#f59e0b,#d97706)') : 'linear-gradient(90deg,#1e3a5f,#1e3a5f)',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
-            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-        </svg>
-      ),
-      sub: 'Supervisor presence',
-      bar: stats.lecturerPresent ? 100 : 0,
     },
     {
       label: 'Alert',
@@ -339,385 +536,326 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
   ];
 
   return (
-    <div className="flex flex-col min-h-full w-full transition-theme" style={{ background: 'var(--surface-0)' }}>
+    <div className="flex h-full w-full transition-theme" style={{ background: 'var(--surface-0)' }}>
 
-      {/* ── Demo banner ──────────────────────────────────────── */}
-      {isDemoMode && (
-        <div
-          className="px-5 py-2 flex items-center gap-3 shrink-0"
-          style={{ background: 'rgba(245,158,11,0.08)', borderBottom: '1px solid rgba(245,158,11,0.25)' }}
-        >
-          <span className="w-1.5 h-1.5 rounded-full live-dot" style={{ background: '#f59e0b' }} />
-          <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#fbbf24' }}>
-            Demo Mode Active — Simulated Data
-          </span>
-          <span className="hidden md:inline text-[9px]" style={{ color: 'rgba(251,191,36,0.55)' }}>
-            All data is synthetic · No real cameras or API calls
-          </span>
-          <span className="ml-auto text-[9px] font-mono px-2 py-0.5 rounded-md"
-                style={{ background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.30)', color: '#fbbf24' }}>
-            CS302 · Dr. Sarah Chen
-          </span>
-        </div>
-      )}
+      {/* ── CENTER: main dashboard content ──────────────────────── */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-auto">
 
-      {/* ── Session info bar ─────────────────────────────────── */}
-      <div
-        className="px-5 py-2.5 shrink-0 flex items-center justify-between gap-3 relative"
-        style={{ background: 'var(--surface-1)', borderBottom: '1px solid var(--border-0)' }}
-      >
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-2)' }}>
-            Room 402-B
-          </span>
-          {isLive && (
-            <>
-              <div className="w-px h-3" style={{ background: 'var(--border-1)' }} />
-              <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full live-dot"
-                      style={{ background: isDemoMode ? '#f59e0b' : 'var(--success)' }} />
-                <span className="text-[10px] font-semibold"
-                      style={{ color: isDemoMode ? '#fbbf24' : 'var(--success)' }}>
-                  {isDemoMode ? 'DEMO' : 'LIVE'}
-                </span>
-              </div>
-              {sessionDuration && (
-                <>
-                  <div className="w-px h-3" style={{ background: 'var(--border-1)' }} />
-                  <span className="text-[10px] font-mono" style={{ color: 'var(--text-2)' }}>
-                    {sessionDuration}
-                  </span>
-                </>
-              )}
-              {stats.engagement > 0 && (
-                <>
-                  <div className="w-px h-3" style={{ background: 'var(--border-1)' }} />
-                  <span className="text-[10px] font-mono font-bold" style={{ color: engColor }}>
-                    {stats.engagement}% engagement
-                  </span>
-                </>
-              )}
-            </>
-          )}
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[9px] font-mono px-2 py-1 rounded-lg"
-                style={{ background: 'var(--surface-2)', color: 'var(--text-3)', border: '1px solid var(--border-0)' }}>
-            Gemini 2.0 · HSEmotion · YOLOv11
-          </span>
-          {!isDemoMode && activeSlotKey && (
-            <button
-              onClick={stopActive}
-              className="px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all"
-              style={{ background: 'var(--danger-dim)', border: '1px solid rgba(239,68,68,0.40)', color: 'var(--danger)' }}
-              onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.20)')}
-              onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = 'var(--danger-dim)')}
-            >
-              Stop Feed
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ── Camera Source Strip (hidden in demo mode) ───────── */}
-      <div className={`px-5 pt-4 pb-0 shrink-0 ${isDemoMode ? 'hidden' : ''}`}>
-        <div className="section-label mb-3">
-          <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--brand)', boxShadow: '0 0 6px var(--brand-glow)' }} />
-          Live Feeds
-        </div>
-        <div className="flex items-center gap-3 overflow-x-auto pb-3 no-scrollbar">
-          {slots.map(slot => {
-            const style   = SLOT_STYLE[slot.type];
-            const isActive = activeSlotKey === slot.key;
-            const hasUrl   = slot.type !== 'webcam' && slot.type !== 'upload' ? !!slot.url : true;
-            return (
-              <div
-                key={slot.key}
-                className="relative flex-shrink-0 cursor-pointer group"
-                style={{ width: 190 }}
-                onClick={() => activateSlot(slot)}
-              >
-                <div
-                  className="rounded-2xl overflow-hidden relative transition-all duration-200"
-                  style={{
-                    height: 118,
-                    background: 'var(--surface-2)',
-                    border: `2px solid ${isActive ? style.border : 'var(--border-0)'}`,
-                    boxShadow: isActive ? `0 0 0 3px ${style.glow}, var(--shadow-md)` : 'var(--shadow-sm)',
-                  }}
-                >
-                  {slot.thumbnail && isActive ? (
-                    <img src={slot.thumbnail} alt={slot.label} className="w-full h-full object-cover" />
-                  ) : (
-                    <div
-                      className="w-full h-full flex flex-col items-center justify-center gap-2"
-                      style={{
-                        background: isActive ? `${style.border}12` : 'transparent',
-                        color: isActive ? style.text : 'var(--text-3)',
-                      }}
-                    >
-                      <SlotTypeIcon type={slot.type} size={26} />
-                      {!hasUrl && (
-                        <span className="text-[9px] font-semibold uppercase tracking-widest"
-                              style={{ color: 'var(--text-3)' }}>
-                          Click to configure
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Status badge */}
-                  <div className="absolute top-2 left-2">
-                    {isActive ? (
-                      <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold text-white uppercase ${style.badge}`}>
-                        <span className="w-1 h-1 rounded-full bg-white live-dot" /> Live
-                      </span>
-                    ) : (
-                      <span className="flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase"
-                            style={{ background: 'rgba(0,0,0,0.60)', color: 'rgba(255,255,255,0.40)' }}>
-                        Idle
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Type pill */}
-                  <div className="absolute bottom-2 left-2">
-                    <span className="px-1.5 py-0.5 rounded-md text-[8px] font-mono uppercase"
-                          style={{ background: 'rgba(0,0,0,0.60)', color: style.text }}>
-                      {slot.type}
-                    </span>
-                  </div>
-
-                  {/* Remove button */}
-                  {!slot.isFixed && !isActive && (
-                    <button
-                      className="absolute top-2 right-2 w-5 h-5 rounded-full bg-black/60 text-white/50 hover:text-red-400 text-xs hidden group-hover:flex items-center justify-center"
-                      onClick={e => { e.stopPropagation(); removeSlot(slot.key); }}
-                    >
-                      ×
-                    </button>
-                  )}
-
-                  {/* Edit URL */}
-                  {slot.type === 'rtsp' && slot.url && !isActive && (
-                    <button
-                      className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded text-[8px] font-mono hidden group-hover:block"
-                      style={{ background: 'rgba(0,0,0,0.65)', color: 'rgba(255,255,255,0.50)' }}
-                      onClick={e => { e.stopPropagation(); setUrlModal({ slotKey: slot.key, current: slot.url }); setUrlInput(slot.url ?? ''); }}
-                    >
-                      edit
-                    </button>
-                  )}
-                </div>
-
-                <div className="mt-1.5 px-0.5">
-                  <p className="text-[11px] font-semibold truncate"
-                     style={{ color: isActive ? 'var(--text-0)' : 'var(--text-1)' }}>
-                    {slot.label}
-                  </p>
-                  <p className="text-[9px] truncate" style={{ color: 'var(--text-3)', maxWidth: 185 }}>
-                    {slot.url ? slot.url : slot.sublabel}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Add RTSP camera */}
-          <div
-            className="flex-shrink-0 cursor-pointer"
-            style={{ width: 190 }}
-            onClick={() => { setAddRtspModal(true); setUrlInput(''); setNewCamLabel(''); }}
-          >
-            <div
-              className="rounded-2xl flex flex-col items-center justify-center gap-2 transition-all"
-              style={{ height: 118, border: '2px dashed var(--border-1)', background: 'transparent' }}
-              onMouseEnter={e => ((e.currentTarget as HTMLElement).style.borderColor = 'rgba(59,130,246,0.40)')}
-              onMouseLeave={e => ((e.currentTarget as HTMLElement).style.borderColor = 'var(--border-1)')}
-            >
-              <svg className="w-5 h-5" style={{ color: 'var(--text-3)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 4v16m8-8H4" />
-              </svg>
-              <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-3)' }}>
-                Add RTSP Camera
-              </span>
-            </div>
-            <div className="mt-1.5 px-0.5">
-              <p className="text-[11px] font-semibold" style={{ color: 'var(--text-2)' }}>New Feed</p>
-              <p className="text-[9px]" style={{ color: 'var(--text-3)' }}>RTSP / IP camera</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── AI Insights strip ────────────────────────────────── */}
-      <div
-        className="mx-5 mb-3 rounded-2xl px-4 py-3 flex items-start gap-3 relative overflow-hidden"
-        style={{
-          background: 'linear-gradient(135deg, var(--surface-2) 0%, var(--surface-3) 100%)',
-          border: '1px solid rgba(99,102,241,0.22)',
-          boxShadow: '0 0 20px rgba(99,102,241,0.06)',
-        }}
-      >
-        {/* Gradient top accent */}
-        <div className="absolute top-0 left-0 right-0 h-px"
-             style={{ background: 'linear-gradient(90deg, transparent, var(--indigo), var(--brand), transparent)', opacity: 0.6 }} />
-        <div className="shrink-0 flex items-center gap-2 mr-1 mt-0.5">
-          <div
-            className="flex items-center gap-1.5 px-2 py-1 rounded-lg"
-            style={{ background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(99,102,241,0.28)' }}
-          >
-            <span className="w-1.5 h-1.5 rounded-full neon-pulse" style={{ background: '#a78bfa', boxShadow: '0 0 6px rgba(167,139,250,0.60)' }} />
-            <span className="text-[9px] font-black uppercase tracking-[0.16em]" style={{ color: '#a78bfa' }}>
-              AI
+        {/* Demo banner */}
+        {isDemoMode && (
+          <div className="px-5 py-2 flex items-center gap-3 shrink-0"
+               style={{ background: 'rgba(245,158,11,0.08)', borderBottom: '1px solid rgba(245,158,11,0.25)' }}>
+            <span className="w-1.5 h-1.5 rounded-full live-dot" style={{ background: '#f59e0b' }} />
+            <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#fbbf24' }}>
+              Demo Mode Active — Simulated Data
+            </span>
+            <span className="hidden md:inline text-[9px]" style={{ color: 'rgba(251,191,36,0.55)' }}>
+              All data is synthetic · No real cameras or API calls
+            </span>
+            <span className="ml-auto text-[9px] font-mono px-2 py-0.5 rounded-md"
+                  style={{ background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.30)', color: '#fbbf24' }}>
+              CS302 · Dr. Sarah Chen
             </span>
           </div>
-        </div>
-        <div className="flex flex-wrap gap-2 min-w-0">
-          {insights.map((ins, i) => (
-            <span key={i} className="insight-chip">
-              <span className="font-bold" style={{ color: ins.color, fontSize: 11 }}>{ins.icon}</span>
-              <span>{ins.text}</span>
-            </span>
-          ))}
-        </div>
-      </div>
+        )}
 
-      {/* ── KPI Row ──────────────────────────────────────────── */}
-      <div className="px-5 mb-4 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
-        {kpis.map(kpi => (
-          <div
-            key={kpi.label}
-            className="kpi-card"
-            style={{ '--kpi-accent': kpi.accent } as React.CSSProperties}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[9px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-2)' }}>
-                {kpi.label}
-              </span>
-              <span style={{ color: kpi.color, opacity: 0.65 }}>{kpi.icon}</span>
-            </div>
-            <p className="font-black leading-none mb-2 font-mono" style={{ fontSize: 22, color: kpi.color, letterSpacing: '-0.04em' }}>
-              {kpi.value}
-            </p>
-            <div className="eng-bar mb-2">
-              <div className="eng-bar-fill" style={{ width: `${kpi.bar}%`, background: kpi.accent }} />
-            </div>
-            <p className="text-[9px] font-mono truncate" style={{ color: 'var(--text-3)' }}>{kpi.sub}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Main content grid ────────────────────────────────── */}
-      <div className="flex-1 px-5 pb-5 flex flex-col gap-4 min-h-0 overflow-auto">
-
-        {/* Row 1: video + right analytics */}
-        <div className="flex flex-col xl:flex-row gap-4" style={{ minHeight: 420 }}>
-
-          {/* Video feed — real or demo */}
-          <div className="flex-1 min-w-0">
-            {isDemoMode ? (
-              <MockFeedPanel
-                faceEmotions={liveEmotionData.faceEmotions}
-                headcount={stats.headcount}
-                engagement={stats.engagement}
-                isRunning={isDemoMode}
-              />
-            ) : (
-              <RoomCard
-                name="Room 402-B / Main Stage"
-                capacity={ROOM_CAPACITY}
-                roomId={ROOM_ID}
-                sessionId={currentSession?.id}
-                onStatsUpdate={handleStatsUpdate}
-                triggerSource={trigger}
-                onRtspThumbnail={handleRtspThumbnail}
-                externalFileInput={fileInputRef}
-              />
+        {/* Session banner */}
+        <div className="px-5 py-2.5 shrink-0 flex items-center justify-between gap-3 relative"
+             style={{ background: 'var(--surface-1)', borderBottom: '1px solid var(--border-0)' }}>
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-2)' }}>Room 402-B</span>
+            {isLive && (
+              <>
+                <div className="w-px h-3" style={{ background: 'var(--border-1)' }} />
+                <div className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full live-dot" style={{ background: isDemoMode ? '#f59e0b' : 'var(--success)' }} />
+                  <span className="text-[10px] font-semibold" style={{ color: isDemoMode ? '#fbbf24' : 'var(--success)' }}>
+                    {isDemoMode ? 'DEMO' : 'LIVE'}
+                  </span>
+                </div>
+                {sessionDuration && (
+                  <>
+                    <div className="w-px h-3" style={{ background: 'var(--border-1)' }} />
+                    <span className="text-[10px] font-mono" style={{ color: 'var(--text-2)' }}>{sessionDuration}</span>
+                  </>
+                )}
+                {stats.engagement > 0 && (
+                  <>
+                    <div className="w-px h-3" style={{ background: 'var(--border-1)' }} />
+                    <span className="text-[10px] font-mono font-bold" style={{ color: engColor }}>{stats.engagement}% engagement</span>
+                  </>
+                )}
+              </>
             )}
           </div>
-
-          {/* Right analytics column */}
-          <div className="xl:w-[290px] flex flex-col gap-3 shrink-0">
-            {/* Live emotion panel */}
-            <div className="flex-1 min-h-0">
-              <LiveEmotionPanel
-                emotionBreakdown={liveEmotionData.emotionBreakdown}
-                dominantEmotion={liveEmotionData.dominantEmotion}
-                pedagogicalNote={liveEmotionData.pedagogicalNote}
-                faceEmotions={liveEmotionData.faceEmotions}
-                isLive={isLive}
-              />
-            </div>
-
-            {/* Session panel */}
-            <div className="shrink-0">
-              <SessionPanel
-                currentSession={activeSession}
-                roomId={ROOM_ID}
-                onSessionStart={isDemoMode ? setMockSession : setCurrentSession}
-                onSessionEnd={isDemoMode ? () => setMockSession(buildMockSession()) : () => setCurrentSession(null)}
-                demoMode={isDemoMode}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Row 2: charts */}
-        <div className="section-label mb-1">
-          <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--indigo)', boxShadow: '0 0 6px rgba(99,102,241,0.60)' }} />
-          Analytics
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          <div className="xl:col-span-2">
-            <EmotionTimelineChart data={emotionHistory} />
-          </div>
-          <div className="xl:col-span-1">
-            <EngagementChart data={engHistory} sessionDuration={sessionDuration} />
-          </div>
-          <div className="xl:col-span-1">
-            <GestureBreakdown gestures={lastGestures} />
-          </div>
-        </div>
-
-        {/* Alerts */}
-        <AlertLog
-          roomId={ROOM_ID}
-          sessionId={activeSession?.id}
-          demoMode={isDemoMode}
-          demoAlerts={demoAlerts}
-          onDemoAlertDismiss={(id) => setDemoAlerts(prev => prev.filter(a => a.id !== id))}
-          onDemoAlertDismissAll={() => setDemoAlerts([])}
-        />
-
-        {/* Footer system info */}
-        <div
-          className="rounded-2xl px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-1 relative overflow-hidden"
-          style={{ background: 'var(--surface-1)', border: '1px solid var(--border-0)' }}
-        >
-          <div className="absolute top-0 left-0 right-0 h-px"
-               style={{ background: 'linear-gradient(90deg, transparent, var(--brand), var(--indigo), var(--cyan), transparent)', opacity: 0.30 }} />
-          {[
-            { label: 'Platform', val: 'EduSphere AI v3' },
-            { label: 'Models', val: 'Gemini 2.0 · HSEmotion B2 · YOLOv11-Pose · YOLO-World' },
-            { label: 'Room', val: 'Room 402-B' },
-            { label: 'Capacity', val: `${ROOM_CAPACITY} seats` },
-            { label: 'License', val: 'University Edition' },
-          ].map(f => (
-            <span key={f.label} className="flex items-center gap-1.5">
-              <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-3)' }}>
-                {f.label}:
-              </span>
-              <span className="text-[9px] font-mono" style={{ color: 'var(--text-2)' }}>{f.val}</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[9px] font-mono px-2 py-1 rounded-lg"
+                  style={{ background: 'var(--surface-2)', color: 'var(--text-3)', border: '1px solid var(--border-0)' }}>
+              Gemini 2.0 · HSEmotion · YOLOv11
             </span>
+            {!isDemoMode && activeSlotKey && (
+              <button
+                onClick={stopActive}
+                className="px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all"
+                style={{ background: 'var(--danger-dim)', border: '1px solid rgba(239,68,68,0.40)', color: 'var(--danger)' }}
+                onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.20)')}
+                onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = 'var(--danger-dim)')}
+              >
+                Stop Feed
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Camera Source Strip (hidden in demo mode) */}
+        <div className={`px-5 pt-4 pb-0 shrink-0 ${isDemoMode ? 'hidden' : ''}`}>
+          <div className="section-label mb-3">
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--brand)', boxShadow: '0 0 6px var(--brand-glow)' }} />
+            Live Feeds
+          </div>
+          <div className="flex items-center gap-3 overflow-x-auto pb-3 no-scrollbar">
+            {slots.map(slot => {
+              const style   = SLOT_STYLE[slot.type];
+              const isActive = activeSlotKey === slot.key;
+              const hasUrl   = slot.type !== 'webcam' && slot.type !== 'upload' ? !!slot.url : true;
+              return (
+                <div
+                  key={slot.key}
+                  className={`relative flex-shrink-0 cursor-pointer group cam-card${isActive ? ' active' : ''}`}
+                  style={{ width: 180 }}
+                  onClick={() => activateSlot(slot)}
+                >
+                  <div
+                    className="overflow-hidden relative transition-all duration-200"
+                    style={{
+                      height: 110,
+                      background: 'var(--surface-2)',
+                      borderRadius: 'var(--radius-md)',
+                      border: `2px solid ${isActive ? style.border : 'var(--border-0)'}`,
+                      boxShadow: isActive ? `0 0 0 3px ${style.glow}, var(--shadow-md)` : 'var(--shadow-sm)',
+                    }}
+                  >
+                    {slot.thumbnail && isActive ? (
+                      <img src={slot.thumbnail} alt={slot.label} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center gap-2"
+                           style={{ background: isActive ? `${style.border}12` : 'transparent', color: isActive ? style.text : 'var(--text-3)' }}>
+                        <SlotTypeIcon type={slot.type} size={24} />
+                        {!hasUrl && <span className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-3)' }}>Click to configure</span>}
+                      </div>
+                    )}
+                    {/* Status badge top-left */}
+                    <div className="absolute top-2 left-2">
+                      {isActive ? (
+                        <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold text-white uppercase ${style.badge}`}>
+                          <span className="w-1 h-1 rounded-full bg-white live-dot" /> Live
+                        </span>
+                      ) : (
+                        <span className="flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase"
+                              style={{ background: 'rgba(0,0,0,0.60)', color: 'rgba(255,255,255,0.40)' }}>Idle</span>
+                      )}
+                    </div>
+                    {/* Resolution/FPS chip bottom-left */}
+                    <div className="absolute bottom-2 left-2">
+                      <span className="px-1.5 py-0.5 rounded-md text-[8px] font-mono uppercase"
+                            style={{ background: 'rgba(0,0,0,0.60)', color: style.text }}>{slot.type}</span>
+                    </div>
+                    {/* AI badge bottom-right */}
+                    {isActive && (
+                      <div className="absolute bottom-2 right-2">
+                        <span className="px-1.5 py-0.5 rounded-md text-[8px] font-bold uppercase"
+                              style={{ background: 'rgba(167,139,250,0.25)', color: '#c4b5fd', border: '1px solid rgba(167,139,250,0.30)' }}>AI</span>
+                      </div>
+                    )}
+                    {/* Remove button */}
+                    {!slot.isFixed && !isActive && (
+                      <button
+                        className="absolute top-2 right-2 w-5 h-5 rounded-full bg-black/60 text-white/50 hover:text-red-400 text-xs hidden group-hover:flex items-center justify-center"
+                        onClick={e => { e.stopPropagation(); removeSlot(slot.key); }}>
+                        ×
+                      </button>
+                    )}
+                    {slot.type === 'rtsp' && slot.url && !isActive && (
+                      <button
+                        className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded text-[8px] font-mono hidden group-hover:block"
+                        style={{ background: 'rgba(0,0,0,0.65)', color: 'rgba(255,255,255,0.50)' }}
+                        onClick={e => { e.stopPropagation(); setUrlModal({ slotKey: slot.key, current: slot.url }); setUrlInput(slot.url ?? ''); }}>
+                        edit
+                      </button>
+                    )}
+                  </div>
+                  <div className="mt-1.5 px-0.5">
+                    <p className="text-[11px] font-semibold truncate" style={{ color: isActive ? 'var(--text-0)' : 'var(--text-1)' }}>{slot.label}</p>
+                    <p className="text-[9px] truncate" style={{ color: 'var(--text-3)', maxWidth: 175 }}>{slot.url ? slot.url : slot.sublabel}</p>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Add RTSP camera */}
+            <div className="flex-shrink-0 cursor-pointer" style={{ width: 180 }}
+                 onClick={() => { setAddRtspModal(true); setUrlInput(''); setNewCamLabel(''); }}>
+              <div className="flex flex-col items-center justify-center gap-2 transition-all"
+                   style={{ height: 110, border: '2px dashed var(--border-1)', background: 'transparent', borderRadius: 'var(--radius-md)' }}
+                   onMouseEnter={e => ((e.currentTarget as HTMLElement).style.borderColor = 'rgba(59,130,246,0.40)')}
+                   onMouseLeave={e => ((e.currentTarget as HTMLElement).style.borderColor = 'var(--border-1)')}>
+                <svg className="w-5 h-5" style={{ color: 'var(--text-3)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 4v16m8-8H4" />
+                </svg>
+                <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-3)' }}>Add RTSP Camera</span>
+              </div>
+              <div className="mt-1.5 px-0.5">
+                <p className="text-[11px] font-semibold" style={{ color: 'var(--text-2)' }}>New Feed</p>
+                <p className="text-[9px]" style={{ color: 'var(--text-3)' }}>RTSP / IP camera</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* AI Insights strip */}
+        <div className="mx-5 mb-3 rounded-2xl px-4 py-3 flex items-start gap-3 relative overflow-hidden"
+             style={{ background: 'linear-gradient(135deg,var(--surface-2) 0%,var(--surface-3) 100%)', border: '1px solid rgba(99,102,241,0.22)', boxShadow: '0 0 20px rgba(99,102,241,0.06)' }}>
+          <div className="absolute top-0 left-0 right-0 h-px"
+               style={{ background: 'linear-gradient(90deg,transparent,var(--indigo),var(--brand),transparent)', opacity: 0.6 }} />
+          <div className="shrink-0 flex items-center gap-2 mr-1 mt-0.5">
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg"
+                 style={{ background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(99,102,241,0.28)' }}>
+              <span className="w-1.5 h-1.5 rounded-full neon-pulse" style={{ background: '#a78bfa', boxShadow: '0 0 6px rgba(167,139,250,0.60)' }} />
+              <span className="text-[9px] font-black uppercase tracking-[0.16em]" style={{ color: '#a78bfa' }}>AI</span>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 min-w-0">
+            {insights.map((ins, i) => (
+              <span key={i} className="insight-chip">
+                <span className="font-bold" style={{ color: ins.color, fontSize: 11 }}>{ins.icon}</span>
+                <span>{ins.text}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* KPI Row */}
+        <div className="px-5 mb-4 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+          {kpis.map(kpi => (
+            <div key={kpi.label} className="kpi-card" style={{ '--kpi-accent': kpi.accent } as React.CSSProperties}>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[9px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-2)' }}>{kpi.label}</span>
+                <span style={{ color: kpi.color, opacity: 0.65 }}>{kpi.icon}</span>
+              </div>
+              <p className="font-black leading-none mb-2 font-mono" style={{ fontSize: 22, color: kpi.color, letterSpacing: '-0.04em' }}>{kpi.value}</p>
+              <div className="eng-bar mb-2">
+                <div className="eng-bar-fill" style={{ width: `${kpi.bar}%`, background: kpi.accent }} />
+              </div>
+              <p className="text-[9px] font-mono truncate" style={{ color: 'var(--text-3)' }}>{kpi.sub}</p>
+            </div>
           ))}
+        </div>
+
+        {/* Main content grid */}
+        <div className="flex-1 px-5 pb-5 flex flex-col gap-4 min-h-0">
+
+          {/* Row 1: video + right analytics */}
+          <div className="flex flex-col xl:flex-row gap-4" style={{ minHeight: 420 }}>
+            {/* Video feed */}
+            <div className="flex-1 min-w-0">
+              {isDemoMode ? (
+                <MockFeedPanel
+                  faceEmotions={liveEmotionData.faceEmotions}
+                  headcount={stats.headcount}
+                  engagement={stats.engagement}
+                  isRunning={isDemoMode}
+                />
+              ) : (
+                <RoomCard
+                  name="Room 402-B / Main Stage"
+                  capacity={ROOM_CAPACITY}
+                  roomId={ROOM_ID}
+                  sessionId={currentSession?.id}
+                  onStatsUpdate={handleStatsUpdate}
+                  triggerSource={trigger}
+                  onRtspThumbnail={handleRtspThumbnail}
+                  externalFileInput={fileInputRef}
+                />
+              )}
+            </div>
+
+            {/* Right analytics column */}
+            <div className="xl:w-[290px] flex flex-col gap-3 shrink-0">
+              <div className="flex-1 min-h-0">
+                <LiveEmotionPanel
+                  emotionBreakdown={liveEmotionData.emotionBreakdown}
+                  dominantEmotion={liveEmotionData.dominantEmotion}
+                  pedagogicalNote={liveEmotionData.pedagogicalNote}
+                  faceEmotions={liveEmotionData.faceEmotions}
+                  isLive={isLive}
+                />
+              </div>
+              <div className="shrink-0">
+                <SessionPanel
+                  currentSession={activeSession}
+                  roomId={ROOM_ID}
+                  onSessionStart={isDemoMode ? setMockSession : setCurrentSession}
+                  onSessionEnd={isDemoMode ? () => setMockSession(buildMockSession()) : () => setCurrentSession(null)}
+                  demoMode={isDemoMode}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Row 2: charts */}
+          <div className="section-label mb-1">
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--indigo)', boxShadow: '0 0 6px rgba(99,102,241,0.60)' }} />
+            Analytics
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div className="xl:col-span-2"><EmotionTimelineChart data={emotionHistory} /></div>
+            <div className="xl:col-span-1"><EngagementChart data={engHistory} sessionDuration={sessionDuration} /></div>
+            <div className="xl:col-span-1"><GestureBreakdown gestures={lastGestures} /></div>
+          </div>
+
+          {/* Alerts */}
+          <AlertLog
+            roomId={ROOM_ID}
+            sessionId={activeSession?.id}
+            demoMode={isDemoMode}
+            demoAlerts={demoAlerts}
+            onDemoAlertDismiss={(id) => setDemoAlerts(prev => prev.filter(a => a.id !== id))}
+            onDemoAlertDismissAll={() => setDemoAlerts([])}
+          />
+
+          {/* Footer */}
+          <div className="rounded-2xl px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-1 relative overflow-hidden"
+               style={{ background: 'var(--surface-1)', border: '1px solid var(--border-0)' }}>
+            <div className="absolute top-0 left-0 right-0 h-px"
+                 style={{ background: 'linear-gradient(90deg,transparent,var(--brand),var(--indigo),var(--cyan),transparent)', opacity: 0.30 }} />
+            {[
+              { label: 'Platform', val: 'EduSphere AI v4' },
+              { label: 'Models',   val: 'Gemini 2.0 · HSEmotion B2 · YOLOv11-Pose · YOLO-World' },
+              { label: 'Room',     val: 'Room 402-B' },
+              { label: 'Capacity', val: `${ROOM_CAPACITY} seats` },
+              { label: 'License',  val: 'University Edition' },
+            ].map(f => (
+              <span key={f.label} className="flex items-center gap-1.5">
+                <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-3)' }}>{f.label}:</span>
+                <span className="text-[9px] font-mono" style={{ color: 'var(--text-2)' }}>{f.val}</span>
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* ── Hidden file input ────────────────────────────────── */}
+      {/* ── RIGHT: Analytics Panel (fixed 300px) ─────────────────── */}
+      <RightAnalyticsPanel
+        stats={stats}
+        isLive={isLive}
+        panelAlerts={panelAlerts}
+        lastUpdated={lastUpdated}
+      />
+
+      {/* Hidden file input */}
       <input ref={fileInputRef} type="file" accept="video/*" className="hidden" onChange={handleFileSelected} />
 
-      {/* ── RTSP Configure modal ─────────────────────────────── */}
+      {/* RTSP Configure modal */}
       {urlModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay">
           <div className="w-full max-w-md rounded-2xl p-6 shadow-2xl fade-up"
@@ -742,7 +880,7 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
               </button>
               <button onClick={confirmRtspUrl}
                 className="flex-1 px-4 py-2.5 rounded-xl text-white text-sm font-semibold transition-colors"
-                style={{ background: 'linear-gradient(135deg, #2563eb, #6366f1)' }}>
+                style={{ background: 'linear-gradient(135deg,#2563eb,#6366f1)' }}>
                 Connect
               </button>
             </div>
@@ -750,27 +888,21 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
         </div>
       )}
 
-      {/* ── Add RTSP modal ────────────────────────────────────── */}
+      {/* Add RTSP modal */}
       {addRtspModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay">
           <div className="w-full max-w-md rounded-2xl p-6 shadow-2xl fade-up"
                style={{ background: 'var(--surface-2)', border: '1px solid var(--border-1)' }}>
             <h3 className="text-base font-bold mb-1" style={{ color: 'var(--text-0)' }}>Add RTSP Camera</h3>
-            <p className="text-sm mb-4" style={{ color: 'var(--text-2)' }}>
-              Add a new IP or RTSP camera to the monitoring strip.
-            </p>
+            <p className="text-sm mb-4" style={{ color: 'var(--text-2)' }}>Add a new IP or RTSP camera to the monitoring strip.</p>
             <div className="flex flex-col gap-3 mb-4">
               <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--text-2)' }}>
-                  Camera Label
-                </label>
+                <label className="block text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--text-2)' }}>Camera Label</label>
                 <input type="text" value={newCamLabel} onChange={e => setNewCamLabel(e.target.value)}
                   placeholder="e.g. Lab Entrance" className="field text-sm" />
               </div>
               <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--text-2)' }}>
-                  RTSP URL
-                </label>
+                <label className="block text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--text-2)' }}>RTSP URL</label>
                 <input type="text" value={urlInput} onChange={e => setUrlInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && addRtspSlot()}
                   placeholder="rtsp://192.168.1.100:554/stream"
@@ -785,7 +917,7 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
               </button>
               <button onClick={addRtspSlot}
                 className="flex-1 px-4 py-2.5 rounded-xl text-white text-sm font-semibold"
-                style={{ background: 'linear-gradient(135deg, #2563eb, #6366f1)' }}>
+                style={{ background: 'linear-gradient(135deg,#2563eb,#6366f1)' }}>
                 Add Camera
               </button>
             </div>

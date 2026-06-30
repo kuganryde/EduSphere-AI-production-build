@@ -33,10 +33,22 @@ const IconMonitor = () => (
       d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
   </svg>
 );
+const IconCamera = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+      d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+  </svg>
+);
 const IconBarChart = () => (
   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
       d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+  </svg>
+);
+const IconUsers = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+      d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
   </svg>
 );
 const IconDoc = () => (
@@ -48,7 +60,25 @@ const IconDoc = () => (
 const IconAudit = () => (
   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
-      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+  </svg>
+);
+const IconBell = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+  </svg>
+);
+const IconGear = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+  </svg>
+);
+const IconCpu = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
+      d="M9 3H7a2 2 0 00-2 2v2M9 3h6M9 3v2m6-2h2a2 2 0 012 2v2m-4-4v2M3 9v6m0-6H1m18 0h2m-2 6h2M3 15v2a2 2 0 002 2h2m-4-4H1m18 4h2m-4 0v2a2 2 0 01-2 2h-2m4-4h2M9 21h6m-6 0v-2m6 2v-2M9 21H7a2 2 0 01-2-2v-2m10 4h2a2 2 0 002-2v-2m-4 0V9a2 2 0 00-2-2H9a2 2 0 00-2 2v10a2 2 0 002 2h4a2 2 0 002-2z" />
   </svg>
 );
 const IconSun = () => (
@@ -69,20 +99,6 @@ const IconSignOut = () => (
       d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
   </svg>
 );
-const IconBell = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
-      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-  </svg>
-);
-
-const NAV: { id: Page; label: string; sub: string; perm?: string; Icon: () => JSX.Element }[] = [
-  { id: 'dashboard', label: 'Dashboard',   sub: 'Live monitoring', Icon: IconDashboard },
-  { id: 'operator',  label: 'Operator',    sub: 'Display mode', perm: 'operator_mode', Icon: IconMonitor },
-  { id: 'analytics', label: 'Analytics',   sub: 'Trends & rooms', perm: 'view_analytics', Icon: IconBarChart },
-  { id: 'reports',   label: 'Reports',     sub: 'Session history', perm: 'view_reports', Icon: IconDoc },
-  { id: 'audit',     label: 'Audit Log',   sub: 'Admin only', perm: 'view_audit_logs', Icon: IconAudit },
-];
 
 const ROLE_CONFIG: Record<string, { label: string; color: string; dot: string }> = {
   admin:    { label: 'Administrator', color: '#f87171', dot: '#ef4444' },
@@ -98,9 +114,15 @@ const PAGE_LABEL: Record<Page, string> = {
   audit:     'Audit Log',
 };
 
+/* ── Sidebar section nav structure ───────────────────────────── */
+interface NavSection {
+  sectionLabel: string;
+  items: { id: Page | 'camera' | 'alerts' | 'settings' | 'syshealth'; label: string; sub: string; perm?: string; Icon: () => JSX.Element; badge?: string; disabled?: boolean }[];
+}
+
 /* ── TopNav ──────────────────────────────────────────────────── */
 function TopNav({
-  page, liveStats, onToggleTheme, isDark, role, openMode, onLogout,
+  page, liveStats, onToggleTheme, isDark, role, openMode, onLogout, alertCount,
 }: {
   page: Page;
   liveStats: AnalysisUpdate | null;
@@ -109,6 +131,7 @@ function TopNav({
   role: string | null;
   openMode: boolean;
   onLogout: () => void;
+  alertCount: number;
 }) {
   const { isDemoMode, setDemoMode } = useDemoMode();
   const [now, setNow] = useState(new Date());
@@ -121,95 +144,72 @@ function TopNav({
   const isLive   = !!liveStats?.headcount;
 
   return (
-    <div className="top-nav" style={{ position: 'relative' }}>
+    <div className="top-nav" style={{ position: 'relative', height: 52 }}>
       {/* Logo ────────────────────────────── */}
-      <div className="flex items-center gap-2.5 shrink-0 mr-4" style={{ minWidth: 0 }}>
-        {/* Logo mark with glow ring */}
+      <div className="flex items-center gap-2.5 shrink-0" style={{ minWidth: 180 }}>
         <div className="relative shrink-0">
-          <div
-            className="absolute inset-0 rounded-lg"
-            style={{ background: 'linear-gradient(135deg, #2563eb, #6366f1)', filter: 'blur(6px)', opacity: 0.55, transform: 'scale(1.1)' }}
-          />
-          <div
-            className="relative w-8 h-8 rounded-lg flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, #2563eb, #6366f1)', boxShadow: '0 2px 12px rgba(37,99,235,0.5), inset 0 1px 0 rgba(255,255,255,0.15)' }}
-          >
-            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M9.663 17h4.673M12 3v1m6.364 1.636-.707.707M21 12h-1M4 12H3m3.343-5.657-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+          <div className="absolute inset-0 rounded-lg" style={{ background: 'linear-gradient(135deg,#2563eb,#6366f1)', filter: 'blur(6px)', opacity: 0.55, transform: 'scale(1.1)' }} />
+          <div className="relative w-7 h-7 rounded-lg flex items-center justify-center"
+               style={{ background: 'linear-gradient(135deg,#2563eb,#6366f1)', boxShadow: '0 2px 12px rgba(37,99,235,0.5),inset 0 1px 0 rgba(255,255,255,0.15)' }}>
+            <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636-.707.707M21 12h-1M4 12H3m3.343-5.657-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
           </div>
         </div>
         <div className="hidden sm:block">
-          <p className="text-xs font-bold leading-tight tracking-tight" style={{ color: '#f0f6ff' }}>EduSphere AI</p>
-          <p className="text-[9px] font-bold uppercase tracking-[0.18em]" style={{ color: 'rgba(99,102,241,0.80)' }}>
-            Classroom Intelligence
-          </p>
+          <p className="text-xs font-black leading-tight tracking-tight" style={{ color: '#f0f6ff' }}>EduSphere AI</p>
+          <p className="text-[8px] font-bold uppercase tracking-[0.20em]" style={{ color: 'rgba(99,102,241,0.75)' }}>Classroom Intelligence</p>
         </div>
       </div>
 
       {/* Divider */}
-      <div className="w-px h-5 shrink-0" style={{ background: 'var(--border-1)' }} />
+      <div className="w-px h-5 shrink-0 mx-1" style={{ background: 'var(--border-1)' }} />
 
-      {/* Page breadcrumb */}
+      {/* Breadcrumb */}
       <div className="hidden md:flex items-center gap-1.5 px-2 shrink-0">
         <span className="text-[10px] font-mono" style={{ color: 'var(--text-3)' }}>/</span>
-        <span className="text-[11px] font-semibold" style={{ color: 'var(--text-1)' }}>
-          {PAGE_LABEL[page]}
-        </span>
+        <span className="text-[11px] font-semibold" style={{ color: 'var(--text-1)' }}>{PAGE_LABEL[page]}</span>
       </div>
 
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* ── Live stats (when active) ───── */}
+      {/* Live stats chips */}
       {isLive && (
         <div className="hidden lg:flex items-center gap-1 mr-2">
           {[
-            { val: `${liveStats?.engagement ?? 0}%`, label: 'ENG', color: liveStats!.engagement > 70 ? '#10b981' : liveStats!.engagement > 40 ? '#f59e0b' : '#ef4444' },
-            { val: `${liveStats?.headcount ?? 0}`, label: 'HEAD', color: '#3b82f6' },
+            { val: `${liveStats?.engagement ?? 0}%`, label: 'ENG',  color: liveStats!.engagement > 70 ? '#10b981' : liveStats!.engagement > 40 ? '#f59e0b' : '#ef4444' },
+            { val: `${liveStats?.headcount ?? 0}`,   label: 'HEAD', color: '#3b82f6' },
             { val: liveStats?.attentionRate != null ? `${liveStats.attentionRate}%` : '—', label: 'ATT', color: '#22d3ee' },
           ].map(m => (
-            <div
-              key={m.label}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg"
-              style={{
-                background: `${m.color}0f`,
-                border: `1px solid ${m.color}28`,
-              }}
-            >
-              <span className="text-[9px] font-bold uppercase tracking-wider font-mono" style={{ color: `${m.color}99` }}>
-                {m.label}
-              </span>
+            <div key={m.label} className="stat-chip" style={{ background: `${m.color}0f`, border: `1px solid ${m.color}28` }}>
+              <span className="text-[9px] font-bold uppercase tracking-wider font-mono" style={{ color: `${m.color}99` }}>{m.label}</span>
               <span className="text-xs font-bold font-mono" style={{ color: m.color }}>{m.val}</span>
             </div>
           ))}
         </div>
       )}
 
+      {/* Divider */}
+      <div className="w-px h-5 shrink-0 mx-1" style={{ background: 'var(--border-0)' }} />
+
+      {/* Session status */}
+      <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg shrink-0"
+           style={{ background: 'var(--surface-3)', border: '1px solid var(--border-0)' }}>
+        <span className="w-1.5 h-1.5 rounded-full" style={{ background: isLive ? 'var(--success)' : 'var(--text-3)', ...(isLive ? { animation: 'pulse-dot 1.8s ease-in-out infinite' } : {}) }} />
+        <span className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: isLive ? 'var(--success)' : 'var(--text-3)' }}>
+          {isLive ? '● LIVE SESSION' : '○ No Session'}
+        </span>
+      </div>
+
       {/* AI status */}
-      <div
-        className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg shrink-0"
-        style={{ background: 'var(--surface-3)', border: '1px solid var(--border-0)' }}
-      >
+      <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg shrink-0"
+           style={{ background: 'var(--surface-3)', border: '1px solid var(--border-0)' }}>
         <div className="relative flex items-center justify-center w-2 h-2">
-          {isLive && (
-            <span
-              className="absolute inset-0 rounded-full"
-              style={{
-                background: 'var(--success)',
-                animation: 'pulse-ring 1.4s ease-out infinite',
-                borderRadius: '50%',
-              }}
-            />
-          )}
-          <span
-            className="w-1.5 h-1.5 rounded-full"
-            style={{ background: isLive ? 'var(--success)' : 'var(--text-3)' }}
-          />
+          {isLive && <span className="absolute inset-0 rounded-full" style={{ background: 'var(--success)', animation: 'pulse-ring 1.4s ease-out infinite', borderRadius: '50%' }} />}
+          <span className="w-1.5 h-1.5 rounded-full" style={{ background: isLive ? 'var(--success)' : 'var(--text-3)' }} />
         </div>
-        <span className="text-[9px] font-bold uppercase tracking-[0.10em]"
-              style={{ color: isLive ? 'var(--success)' : 'var(--text-3)' }}>
+        <span className="text-[9px] font-bold uppercase tracking-[0.10em]" style={{ color: isLive ? 'var(--success)' : 'var(--text-3)' }}>
           {isLive ? 'AI ACTIVE' : 'AI IDLE'}
         </span>
       </div>
@@ -224,7 +224,10 @@ function TopNav({
         </span>
       </div>
 
-      {/* Demo / Real toggle */}
+      {/* Divider */}
+      <div className="w-px h-5 shrink-0 mx-1" style={{ background: 'var(--border-0)' }} />
+
+      {/* Demo/Real toggle */}
       <button
         onClick={() => setDemoMode(!isDemoMode)}
         title={isDemoMode ? 'Switch to Real mode' : 'Switch to Demo mode'}
@@ -243,41 +246,35 @@ function TopNav({
         }
       </button>
 
-      {/* Divider */}
-      <div className="w-px h-6 shrink-0 ml-1" style={{ background: 'var(--border-0)' }} />
-
-      {/* Notification */}
+      {/* Notification bell */}
       <button
-        className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors shrink-0"
-        style={{ color: 'var(--text-2)', border: '1px solid transparent' }}
-        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-3)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-0)'; }}
-        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--text-2)'; }}
+        className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors shrink-0 relative"
+        style={{ color: alertCount > 0 ? '#f59e0b' : 'var(--text-2)', border: '1px solid transparent' }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-3)'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-1)'; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.borderColor = 'transparent'; }}
         title="Notifications"
       >
         <IconBell />
+        {alertCount > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold text-white"
+                style={{ background: '#ef4444', boxShadow: '0 0 6px rgba(239,68,68,0.5)' }}>
+            {alertCount > 9 ? '9+' : alertCount}
+          </span>
+        )}
       </button>
 
       {/* Theme toggle */}
-      <button
-        onClick={onToggleTheme}
-        className="theme-toggle shrink-0"
-        title={isDark ? 'Switch to Day Mode' : 'Switch to Night Mode'}
-        aria-label="Toggle theme"
-      >
+      <button onClick={onToggleTheme} className="theme-toggle shrink-0" title={isDark ? 'Switch to Day Mode' : 'Switch to Night Mode'} aria-label="Toggle theme">
         {isDark ? <IconSun /> : <IconMoon />}
       </button>
 
-      {/* User / logout — always visible */}
-      <div
-        className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl shrink-0"
-        style={{ background: 'var(--surface-3)', border: '1px solid var(--border-1)' }}
-      >
+      {/* User chip */}
+      <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl shrink-0"
+           style={{ background: 'var(--surface-3)', border: '1px solid var(--border-1)' }}>
         {roleMeta && (
           <>
-            <div
-              className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold"
-              style={{ background: 'var(--surface-4)', color: openMode ? 'var(--cyan)' : roleMeta.color }}
-            >
+            <div className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold"
+                 style={{ background: 'var(--surface-4)', color: openMode ? 'var(--cyan)' : roleMeta.color }}>
               {openMode ? '○' : (role ?? 'V')[0].toUpperCase()}
             </div>
             <p className="hidden lg:block text-[10px] font-semibold leading-tight"
@@ -305,8 +302,16 @@ function TopNav({
 function AppShell() {
   const { isAuthenticated, role, logout, can, openMode } = useAuth();
   const { toggle, isDark }                               = useTheme();
-  const [page, setPage]       = useState<Page>('dashboard');
+  const [page, setPage]           = useState<Page>('dashboard');
   const [liveStats, setLiveStats] = useState<AnalysisUpdate | null>(null);
+  const [alertCount, setAlertCount] = useState(0);
+
+  // Count alerts from live stats
+  useEffect(() => {
+    if (liveStats?.alert) {
+      setAlertCount(c => c + 1);
+    }
+  }, [liveStats?.alert]);
 
   if (!isAuthenticated) return <LoginModal />;
 
@@ -319,6 +324,48 @@ function AppShell() {
       </div>
     );
   }
+
+  /* ── Sidebar nav sections ──────────────────────────────────── */
+  const NAV_SECTIONS: NavSection[] = [
+    {
+      sectionLabel: 'MONITORING',
+      items: [
+        { id: 'dashboard', label: 'Dashboard',      sub: 'Live monitoring', Icon: IconDashboard },
+        { id: 'operator',  label: 'Live Monitor',   sub: 'Operator display', perm: 'operator_mode', Icon: IconMonitor },
+        { id: 'camera',    label: 'Camera Manager', sub: 'Source control', Icon: IconCamera },
+      ],
+    },
+    {
+      sectionLabel: 'INTELLIGENCE',
+      items: [
+        { id: 'analytics', label: 'AI Analytics',      sub: 'Trends & rooms', perm: 'view_analytics', Icon: IconBarChart },
+        { id: 'analytics', label: 'Student Analytics', sub: 'Individual data', perm: 'view_analytics', Icon: IconUsers },
+        { id: 'reports',   label: 'Reports',           sub: 'Session history', perm: 'view_reports',   Icon: IconDoc },
+      ],
+    },
+    {
+      sectionLabel: 'ADMINISTRATION',
+      items: [
+        { id: 'alerts',   label: 'Alert Center', sub: 'Active alerts', Icon: IconBell, badge: alertCount > 0 ? String(alertCount > 9 ? '9+' : alertCount) : undefined },
+        { id: 'audit',    label: 'Audit Logs',   sub: 'Admin only', perm: 'view_audit_logs', Icon: IconAudit },
+        { id: 'settings', label: 'Settings',     sub: 'Coming soon', Icon: IconGear, disabled: true },
+      ],
+    },
+    {
+      sectionLabel: 'SYSTEM',
+      items: [
+        { id: 'syshealth', label: 'System Health', sub: liveStats ? 'HEALTHY' : 'IDLE', Icon: IconCpu },
+      ],
+    },
+  ];
+
+  // Map sidebar IDs to actual pages
+  const resolveId = (id: string): Page => {
+    if (id === 'camera' || id === 'alerts') return 'dashboard';
+    if (id === 'syshealth') return 'dashboard';
+    if (id === 'settings') return 'dashboard';
+    return id as Page;
+  };
 
   return (
     <div className="flex flex-col h-screen overflow-hidden transition-theme"
@@ -333,87 +380,115 @@ function AppShell() {
         role={role}
         openMode={openMode}
         onLogout={logout}
+        alertCount={alertCount}
       />
 
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── Sidebar ──────────────────────────────────────────── */}
         <nav
-          className="w-[60px] lg:w-[210px] flex flex-col shrink-0 transition-theme"
+          className="w-[56px] lg:w-[220px] flex flex-col shrink-0 transition-theme overflow-hidden"
           style={{ background: 'var(--surface-1)', borderRight: '1px solid var(--border-0)' }}
         >
-          {/* Institute label */}
+          {/* Institute name pill */}
           <div className="hidden lg:flex items-center gap-2 px-4 py-3"
                style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
             <div className="w-1.5 h-1.5 rounded-full neon-pulse" style={{ background: 'var(--brand)', boxShadow: '0 0 6px var(--brand-glow)' }} />
-            <p className="text-[9px] font-bold uppercase tracking-[0.18em] gradient-text">
-              University Platform
-            </p>
+            <p className="text-[9px] font-bold uppercase tracking-[0.18em] gradient-text">University Platform</p>
           </div>
 
-          {/* Nav items */}
-          <div className="flex-1 py-3 px-2 flex flex-col gap-0.5 overflow-y-auto no-scrollbar">
-            <p className="hidden lg:block px-2 pt-1 pb-2 text-[8px] font-bold uppercase tracking-[0.20em]"
-               style={{ color: 'rgba(255,255,255,0.18)' }}>
-              Navigation
-            </p>
-            {NAV.map(item => {
-              if (item.perm && !can(item.perm)) return null;
-              const active = page === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setPage(item.id)}
-                  title={item.label}
-                  className={`nav-item${active ? ' active' : ''}`}
-                >
-                  <span className="w-4 h-4 shrink-0" style={{ color: active ? 'var(--brand)' : 'inherit' }}>
-                    <item.Icon />
-                  </span>
-                  <div className="hidden lg:block min-w-0 flex-1">
-                    <p className="text-[12px] font-semibold leading-tight truncate">{item.label}</p>
-                    <p className="text-[9px] leading-tight truncate" style={{ opacity: 0.40 }}>{item.sub}</p>
-                  </div>
-                </button>
-              );
-            })}
+          {/* Nav sections */}
+          <div className="flex-1 py-3 px-2 flex flex-col gap-0.5 overflow-y-auto thin-scroll">
+            {NAV_SECTIONS.map((section) => (
+              <div key={section.sectionLabel} className="mb-1">
+                <p className="hidden lg:block px-2 pt-2 pb-1.5 text-[8px] font-black uppercase tracking-[0.22em]"
+                   style={{ color: 'rgba(255,255,255,0.18)' }}>
+                  {section.sectionLabel}
+                </p>
+                {section.items.map((item, idx) => {
+                  if (item.perm && !can(item.perm)) return null;
+                  if (item.disabled) {
+                    return (
+                      <div
+                        key={`${item.id}-${idx}`}
+                        title={item.label}
+                        className="s-item"
+                        style={{ opacity: 0.35, cursor: 'not-allowed' }}
+                      >
+                        <span className="w-4 h-4 shrink-0"><item.Icon /></span>
+                        <div className="hidden lg:flex min-w-0 flex-1 items-center justify-between">
+                          <div>
+                            <p className="text-[12px] font-semibold leading-tight truncate">{item.label}</p>
+                            <p className="text-[9px] leading-tight truncate" style={{ opacity: 0.40 }}>{item.sub}</p>
+                          </div>
+                          <span className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                                style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.25)' }}>
+                            SOON
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  }
+                  const active = page === resolveId(item.id) && item.id !== 'camera' && item.id !== 'alerts' && item.id !== 'syshealth';
+                  return (
+                    <button
+                      key={`${item.id}-${idx}`}
+                      onClick={() => !item.disabled && setPage(resolveId(item.id))}
+                      title={item.label}
+                      className={`s-item w-full text-left${active ? ' active' : ''}`}
+                    >
+                      <span className="w-4 h-4 shrink-0" style={{ color: active ? 'var(--brand)' : 'inherit' }}>
+                        <item.Icon />
+                      </span>
+                      <div className="hidden lg:flex min-w-0 flex-1 items-center justify-between">
+                        <div>
+                          <p className="text-[12px] font-semibold leading-tight truncate">{item.label}</p>
+                          <p className="text-[9px] leading-tight truncate" style={{ opacity: 0.40 }}>{item.sub}</p>
+                        </div>
+                        {/* Badge for alert count or system health */}
+                        {item.badge && (
+                          <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full"
+                                style={{ background: 'rgba(239,68,68,0.18)', color: '#f87171', border: '1px solid rgba(239,68,68,0.30)' }}>
+                            {item.badge}
+                          </span>
+                        )}
+                        {item.id === 'syshealth' && (
+                          <span className="text-[8px] font-bold px-1.5 py-0.5 rounded"
+                                style={{ background: liveStats ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.06)', color: liveStats ? '#10b981' : 'rgba(255,255,255,0.30)', border: liveStats ? '1px solid rgba(16,185,129,0.30)' : '1px solid rgba(255,255,255,0.08)' }}>
+                            {liveStats ? 'HEALTHY' : 'IDLE'}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
           </div>
 
           {/* Footer */}
           <div className="shrink-0 px-2 pb-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-            {/* Role badge */}
             {role && ROLE_CONFIG[role] && (
               <div className="flex items-center gap-2 px-2 py-2 rounded-xl mb-1 mt-3"
                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div className="relative shrink-0">
-                  <div
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold"
-                    style={{
-                      background: `${ROLE_CONFIG[role].color}18`,
-                      border: `1px solid ${ROLE_CONFIG[role].color}35`,
-                      color: ROLE_CONFIG[role].color,
-                    }}
-                  >
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold"
+                       style={{ background: `${ROLE_CONFIG[role].color}18`, border: `1px solid ${ROLE_CONFIG[role].color}35`, color: ROLE_CONFIG[role].color }}>
                     {role[0].toUpperCase()}
                   </div>
-                  <div
-                    className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 live-dot"
-                    style={{ background: ROLE_CONFIG[role].dot, borderColor: 'var(--surface-1)' }}
-                  />
+                  <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 live-dot"
+                       style={{ background: ROLE_CONFIG[role].dot, borderColor: 'var(--surface-1)' }} />
                 </div>
                 <div className="hidden lg:block min-w-0 flex-1">
-                  <p className="text-[11px] font-semibold leading-tight truncate"
-                     style={{ color: ROLE_CONFIG[role].color }}>
+                  <p className="text-[11px] font-semibold leading-tight truncate" style={{ color: ROLE_CONFIG[role].color }}>
                     {openMode ? 'Open Access' : ROLE_CONFIG[role].label}
                   </p>
                   <p className="text-[9px] font-mono leading-tight" style={{ color: 'rgba(255,255,255,0.22)' }}>
-                    {isDark ? 'Night' : 'Day'} Mode
+                    v4 · {isDark ? 'Night' : 'Day'} Mode
                   </p>
                 </div>
               </div>
             )}
-
-            {/* Sign out (mobile/compact) */}
             <button
               onClick={logout}
               title="Sign out"
