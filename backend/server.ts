@@ -47,9 +47,14 @@ const allowedOrigins = [
   "http://localhost:3000",
 ].filter(Boolean);
 
+// Allow any *.railway.app and *.up.railway.app origin dynamically
+const RAILWAY_ORIGIN = /\.railway\.app$/;
+
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    if (RAILWAY_ORIGIN.test(origin)) return cb(null, true);
     cb(new Error(`CORS blocked: ${origin}`));
   },
   methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
