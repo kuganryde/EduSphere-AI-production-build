@@ -120,6 +120,12 @@ interface NavSection {
   items: { id: Page | 'camera' | 'alerts' | 'settings' | 'syshealth'; label: string; sub: string; perm?: string; Icon: () => JSX.Element; badge?: string; disabled?: boolean }[];
 }
 
+/* ── Greeting helper ─────────────────────────────────────────── */
+function getGreeting() {
+  const h = new Date().getHours();
+  return h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening';
+}
+
 /* ── TopNav ──────────────────────────────────────────────────── */
 function TopNav({
   page, liveStats, onToggleTheme, isDark, role, openMode, onLogout, alertCount,
@@ -165,14 +171,36 @@ function TopNav({
       {/* Divider */}
       <div className="w-px h-5 shrink-0 mx-1" style={{ background: 'var(--border-1)' }} />
 
-      {/* Breadcrumb */}
-      <div className="hidden md:flex items-center gap-1.5 px-2 shrink-0">
-        <span className="text-[10px] font-mono" style={{ color: 'var(--text-3)' }}>/</span>
-        <span className="text-[11px] font-semibold" style={{ color: 'var(--text-1)' }}>{PAGE_LABEL[page]}</span>
+      {/* Greeting */}
+      <div className="hidden md:flex flex-col shrink-0 px-1">
+        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-0)' }}>
+          {getGreeting()}! {openMode ? '' : roleMeta?.label ?? ''}
+        </span>
+        <span style={{ fontSize: 10, color: 'var(--text-2)' }}>
+          EduSphere AI Classroom Intelligence Platform
+        </span>
       </div>
 
       {/* Spacer */}
       <div className="flex-1" />
+
+      {/* System status chips */}
+      <div className="hidden lg:flex items-center gap-2 mr-3">
+        <div className="stat-chip" style={{ background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.25)', color: '#10b981' }}>
+          <span className="pulse-dot" style={{ color: '#10b981', width: 6, height: 6 }} />
+          <span style={{ fontSize: 10 }}>AI Online</span>
+        </div>
+        <div className="stat-chip" style={{ background: 'var(--surface-3)', border: '1px solid var(--border-0)', color: 'var(--text-1)' }}>
+          <span style={{ fontSize: 10 }}>Cameras</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-0)' }}>1/4</span>
+        </div>
+        {liveStats?.attentionRate != null && (
+          <div className="stat-chip" style={{ background: 'var(--surface-3)', border: '1px solid var(--border-0)', color: 'var(--text-1)' }}>
+            <span style={{ fontSize: 10 }}>Attention</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#22d3ee' }}>{liveStats.attentionRate}%</span>
+          </div>
+        )}
+      </div>
 
       {/* Live stats chips */}
       {isLive && (
@@ -180,7 +208,6 @@ function TopNav({
           {[
             { val: `${liveStats?.engagement ?? 0}%`, label: 'ENG',  color: liveStats!.engagement > 70 ? '#10b981' : liveStats!.engagement > 40 ? '#f59e0b' : '#ef4444' },
             { val: `${liveStats?.headcount ?? 0}`,   label: 'HEAD', color: '#3b82f6' },
-            { val: liveStats?.attentionRate != null ? `${liveStats.attentionRate}%` : '—', label: 'ATT', color: '#22d3ee' },
           ].map(m => (
             <div key={m.label} className="stat-chip" style={{ background: `${m.color}0f`, border: `1px solid ${m.color}28` }}>
               <span className="text-[9px] font-bold uppercase tracking-wider font-mono" style={{ color: `${m.color}99` }}>{m.label}</span>
@@ -330,31 +357,35 @@ function AppShell() {
     {
       sectionLabel: 'MONITORING',
       items: [
-        { id: 'dashboard', label: 'Dashboard',      sub: 'Live monitoring', Icon: IconDashboard },
-        { id: 'operator',  label: 'Live Monitor',   sub: 'Operator display', perm: 'operator_mode', Icon: IconMonitor },
-        { id: 'camera',    label: 'Camera Manager', sub: 'Source control', Icon: IconCamera },
+        { id: 'dashboard', label: 'Dashboard',      sub: 'Live overview',    Icon: IconDashboard },
+        { id: 'operator',  label: 'Live Monitoring', sub: 'Operator display', perm: 'operator_mode', Icon: IconMonitor },
+        { id: 'camera',    label: 'Camera Manager', sub: 'Source control',   Icon: IconCamera },
       ],
     },
     {
-      sectionLabel: 'INTELLIGENCE',
+      sectionLabel: 'ANALYTICS',
       items: [
-        { id: 'analytics', label: 'AI Analytics',      sub: 'Trends & rooms', perm: 'view_analytics', Icon: IconBarChart },
-        { id: 'analytics', label: 'Student Analytics', sub: 'Individual data', perm: 'view_analytics', Icon: IconUsers },
-        { id: 'reports',   label: 'Reports',           sub: 'Session history', perm: 'view_reports',   Icon: IconDoc },
+        { id: 'analytics', label: 'Student Analytics',   sub: 'Individual data',   perm: 'view_analytics', Icon: IconUsers },
+        { id: 'analytics', label: 'Lecturer Analytics',  sub: 'Lecturer insights', perm: 'view_analytics', Icon: IconBarChart },
+        { id: 'analytics', label: 'Classroom Analytics', sub: 'Room-level data',   perm: 'view_analytics', Icon: IconBarChart },
+        { id: 'analytics', label: 'AI Insights',         sub: 'Smart analysis',    perm: 'view_analytics', Icon: IconBarChart },
       ],
     },
     {
-      sectionLabel: 'ADMINISTRATION',
+      sectionLabel: 'MANAGEMENT',
       items: [
-        { id: 'alerts',   label: 'Alert Center', sub: 'Active alerts', Icon: IconBell, badge: alertCount > 0 ? String(alertCount > 9 ? '9+' : alertCount) : undefined },
-        { id: 'audit',    label: 'Audit Logs',   sub: 'Admin only', perm: 'view_audit_logs', Icon: IconAudit },
-        { id: 'settings', label: 'Settings',     sub: 'Coming soon', Icon: IconGear, disabled: true },
+        { id: 'reports',  label: 'Session Management', sub: 'Active sessions',  perm: 'view_reports',   Icon: IconDoc },
+        { id: 'reports',  label: 'Reports & Export',   sub: 'Download data',    perm: 'view_reports',   Icon: IconDoc },
+        { id: 'alerts',   label: 'Alert Center',       sub: 'Active alerts',    Icon: IconBell,         badge: alertCount > 0 ? String(alertCount > 9 ? '9+' : alertCount) : undefined },
       ],
     },
     {
       sectionLabel: 'SYSTEM',
       items: [
         { id: 'syshealth', label: 'System Health', sub: liveStats ? 'HEALTHY' : 'IDLE', Icon: IconCpu },
+        { id: 'settings',  label: 'Settings',      sub: 'Coming soon', Icon: IconGear, disabled: true },
+        { id: 'audit',     label: 'Users & Roles', sub: 'Access control', perm: 'view_audit_logs', Icon: IconUsers },
+        { id: 'audit',     label: 'Audit Logs',    sub: 'Activity log',   perm: 'view_audit_logs', Icon: IconAudit },
       ],
     },
   ];
@@ -468,8 +499,20 @@ function AppShell() {
 
           {/* Footer */}
           <div className="shrink-0 px-2 pb-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+            {/* EduSphere branding card */}
+            <div className="hidden lg:block mx-0 mb-2 mt-3 p-3 rounded-xl" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.15), rgba(99,102,241,0.15))', border: '1px solid rgba(59,130,246,0.2)' }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: '#93c5fd' }}>EduSphere AI</p>
+                  <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>University Edition</p>
+                  <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', marginTop: 2 }}>v2.2.0</p>
+                </div>
+                <div style={{ fontSize: 28 }}>🎓</div>
+              </div>
+            </div>
+
             {role && ROLE_CONFIG[role] && (
-              <div className="flex items-center gap-2 px-2 py-2 rounded-xl mb-1 mt-3"
+              <div className="flex items-center gap-2 px-2 py-2 rounded-xl mb-1 mt-1"
                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div className="relative shrink-0">
                   <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold"
@@ -489,6 +532,19 @@ function AppShell() {
                 </div>
               </div>
             )}
+
+            {/* Need Help? */}
+            <div className="hidden lg:block mt-1 px-2">
+              <a href="#" style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}
+                 onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = '#60a5fa')}
+                 onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.25)')}>
+                <svg width={10} height={10} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Need Help?
+              </a>
+            </div>
+
             <button
               onClick={logout}
               title="Sign out"

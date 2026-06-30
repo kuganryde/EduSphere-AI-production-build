@@ -123,7 +123,118 @@ const EMOTION_COLORS: Record<string, string> = {
   disgust:  '#a78bfa',
 };
 
-/* ── Right Analytics Panel ──────────────────────────────────── */
+/* ── KpiCard ────────────────────────────────────────────────── */
+interface KpiCardProps {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  sub: string;
+  subColor: string;
+  accent: string;
+  sparkData?: number[];
+}
+
+function KpiCard({ icon, label, value, sub, subColor, accent, sparkData }: KpiCardProps) {
+  const spark = sparkData && sparkData.length > 1 ? (
+    <svg width="56" height="22" viewBox="0 0 56 22" style={{ flexShrink: 0 }}>
+      <polyline
+        points={sparkData.map((v, i) => `${(i / (sparkData.length - 1)) * 56},${22 - (v / 100) * 18}`).join(' ')}
+        fill="none" stroke={accent} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+        opacity={0.65}
+      />
+    </svg>
+  ) : null;
+
+  return (
+    <div className="e-card anim-fade-up" style={{ padding: '10px 12px', position: 'relative', overflow: 'hidden', minWidth: 0 }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: accent, opacity: 0.75, borderRadius: '14px 14px 0 0' }} />
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 6 }}>
+        <div style={{ width: 26, height: 26, borderRadius: 7, background: `${accent}18`, border: `1px solid ${accent}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: accent, flexShrink: 0 }}>
+          {icon}
+        </div>
+        {spark}
+      </div>
+      <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-0)', fontFamily: 'JetBrains Mono', letterSpacing: '-0.03em', lineHeight: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {value}
+      </div>
+      <div style={{ fontSize: 10, color: 'var(--text-2)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: subColor, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</div>
+    </div>
+  );
+}
+
+/* ── EmotionDonut ──────────────────────────────────────────── */
+function EmotionDonut({ breakdown, total }: { breakdown: Record<string, number>; total: number }) {
+  const entries = Object.entries(breakdown).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  const R = 44, C = 2 * Math.PI * R;
+
+  let offset = 0;
+  const slices = entries.map(([emotion, pct]) => {
+    const len = (pct / 100) * C;
+    const slice = { emotion, pct, len, offset, color: EMOTION_COLORS[emotion] ?? '#475569' };
+    offset += len;
+    return slice;
+  });
+
+  return (
+    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+      <div style={{ position: 'relative', width: 100, height: 100, flexShrink: 0 }}>
+        <svg width={100} height={100} viewBox="0 0 100 100">
+          <circle cx={50} cy={50} r={R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={13} />
+          {slices.map(s => (
+            <circle key={s.emotion} cx={50} cy={50} r={R} fill="none"
+              stroke={s.color} strokeWidth={11}
+              strokeDasharray={`${s.len} ${C - s.len}`}
+              strokeDashoffset={C / 4 - s.offset}
+              strokeLinecap="round"
+              style={{ transition: 'stroke-dasharray 0.5s ease' }}
+            />
+          ))}
+        </svg>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-0)', fontFamily: 'JetBrains Mono' }}>{total}</span>
+          <span style={{ fontSize: 8, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Total</span>
+        </div>
+      </div>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
+        {entries.slice(0, 7).map(([emotion, pct]) => (
+          <div key={emotion} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <div style={{ width: 7, height: 7, borderRadius: 2, background: EMOTION_COLORS[emotion] ?? '#475569', flexShrink: 0 }} />
+            <span style={{ fontSize: 10, color: 'var(--text-1)', flex: 1, textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{emotion}</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-0)', fontFamily: 'JetBrains Mono', minWidth: 28, textAlign: 'right' }}>{pct.toFixed(0)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── CircularGauge ─────────────────────────────────────────── */
+function CircularGauge({ value, label, color }: { value: number; label: string; color: string }) {
+  const R = 24, C = 2 * Math.PI * R;
+  const filled = (value / 100) * C;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+      <div style={{ position: 'relative', width: 56, height: 56 }}>
+        <svg width={56} height={56} viewBox="0 0 56 56">
+          <circle cx={28} cy={28} r={R} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={7} />
+          <circle cx={28} cy={28} r={R} fill="none" stroke={color} strokeWidth={6}
+            strokeDasharray={`${filled} ${C - filled}`}
+            strokeDashoffset={C / 4}
+            strokeLinecap="round"
+            style={{ transition: 'stroke-dasharray 0.6s ease' }}
+          />
+        </svg>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-0)', fontFamily: 'JetBrains Mono' }}>{value}%</span>
+        </div>
+      </div>
+      <span style={{ fontSize: 8, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</span>
+    </div>
+  );
+}
+
+/* ── Panel Alerts type ──────────────────────────────────────── */
 interface PanelAlert {
   id: string;
   message: string;
@@ -131,158 +242,126 @@ interface PanelAlert {
   time: string;
 }
 
+/* ── Right Analytics Panel ──────────────────────────────────── */
 interface RightPanelProps {
   stats: Omit<AnalysisUpdate, 'timestamp'>;
   isLive: boolean;
   panelAlerts: PanelAlert[];
   lastUpdated: string;
+  sysMetrics: { gpu: number; cpu: number; memory: number; storage: number };
 }
 
-function RightAnalyticsPanel({ stats, isLive, panelAlerts, lastUpdated }: RightPanelProps) {
+function RightAnalyticsPanel({ stats, isLive, panelAlerts, lastUpdated, sysMetrics }: RightPanelProps) {
   const insights = buildInsights(stats);
-
-  const latencyVal = 1200; // placeholder latency
+  const latencyVal = isLive ? 1200 : 0;
   const latencyColor = latencyVal < 2000 ? '#10b981' : latencyVal < 4000 ? '#f59e0b' : '#ef4444';
-
   const emotionEntries = stats.emotionBreakdown
-    ? Object.entries(stats.emotionBreakdown).sort((a, b) => b[1] - a[1])
+    ? Object.entries(stats.emotionBreakdown).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1])
     : [];
+  const hasEmotions = emotionEntries.length > 0;
 
   return (
-    <div
-      className="flex flex-col gap-0 overflow-y-auto thin-scroll shrink-0"
-      style={{ width: 300, background: 'var(--surface-1)', borderLeft: '1px solid var(--border-0)' }}
-    >
-      {/* Header */}
-      <div className="px-4 py-3 shrink-0" style={{ borderBottom: '1px solid var(--border-0)', background: 'var(--surface-2)' }}>
-        <div className="flex items-center gap-2">
-          <div className="w-1 h-4 rounded-full" style={{ background: 'linear-gradient(180deg,#a78bfa,#6366f1)' }} />
-          <span className="text-[10px] font-black uppercase tracking-[0.16em]" style={{ color: 'rgba(255,255,255,0.45)' }}>
-            Analytics Panel
-          </span>
-          <div className="ml-auto w-1.5 h-1.5 rounded-full neon-pulse"
-               style={{ background: isLive ? 'var(--success)' : 'var(--text-3)', boxShadow: isLive ? '0 0 6px var(--success)' : 'none' }} />
-        </div>
-      </div>
+    <div style={{ width: 292, background: 'var(--surface-1)', borderLeft: '1px solid var(--border-0)', display: 'flex', flexDirection: 'column', overflow: 'hidden', flexShrink: 0 }}>
+      <div className="thin-scroll" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
 
-      <div className="flex flex-col gap-0 overflow-y-auto thin-scroll flex-1">
-        {/* ── Section 1: AI Insights ────────────────────────────── */}
-        <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--border-0)' }}>
+        {/* Emotion Distribution */}
+        <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border-0)' }}>
           <div className="section-header-ent">
-            <span className="w-1.5 h-1.5 rounded-full neon-pulse" style={{ background: '#a78bfa', boxShadow: '0 0 6px rgba(167,139,250,0.6)' }} />
-            AI INSIGHTS
+            <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#22d3ee', flexShrink: 0 }} />
+            EMOTION DISTRIBUTION
           </div>
-          <div className="flex flex-col gap-1.5">
-            {insights.slice(0, 5).map((ins, i) => (
-              <div key={i} className="flex items-start gap-2 py-1">
-                <span className="text-[11px] font-bold shrink-0 mt-0.5" style={{ color: ins.color, width: 14, textAlign: 'center' }}>{ins.icon}</span>
-                <span className="text-[11px] leading-snug" style={{ color: 'rgba(255,255,255,0.65)' }}>{ins.text}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ── Section 2: Emotion Distribution ──────────────────── */}
-        <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--border-0)' }}>
-          <div className="section-header-ent">
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#22d3ee' }} />
-            EMOTION BREAKDOWN
-          </div>
-          {emotionEntries.length > 0 ? (
-            <div className="flex flex-col gap-2">
-              {emotionEntries.map(([emotion, pct]) => (
-                <div key={emotion}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] font-semibold capitalize" style={{ color: EMOTION_COLORS[emotion] ?? 'var(--text-1)' }}>
-                      {emotion}
-                    </span>
-                    <span className="text-[10px] font-bold font-mono" style={{ color: EMOTION_COLORS[emotion] ?? 'var(--text-1)' }}>
-                      {pct.toFixed(0)}%
-                    </span>
-                  </div>
-                  <div className="prog-bar">
-                    <div className="prog-bar-fill" style={{ width: `${Math.min(pct, 100)}%`, background: EMOTION_COLORS[emotion] ?? 'var(--brand)' }} />
-                  </div>
-                </div>
-              ))}
-            </div>
+          {hasEmotions && stats.emotionBreakdown ? (
+            <EmotionDonut breakdown={stats.emotionBreakdown} total={stats.headcount} />
           ) : (
-            <div className="flex flex-col gap-2">
-              {['happy','neutral','sad','angry','fear','surprise'].map(em => (
-                <div key={em}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] font-semibold capitalize" style={{ color: 'rgba(255,255,255,0.2)' }}>{em}</span>
-                    <span className="text-[10px] font-bold font-mono" style={{ color: 'rgba(255,255,255,0.2)' }}>—</span>
-                  </div>
-                  <div className="skeleton" style={{ height: 4, borderRadius: 2 }} />
-                </div>
-              ))}
+            <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--text-3)', fontSize: 11 }}>
+              Activate camera to see emotions
             </div>
           )}
         </div>
 
-        {/* ── Section 3: System Metrics ────────────────────────── */}
-        <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--border-0)' }}>
+        {/* AI Insights */}
+        <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border-0)' }}>
           <div className="section-header-ent">
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#3b82f6' }} />
-            SYSTEM METRICS
+            <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#a78bfa', flexShrink: 0, animation: 'neon-pulse 2.4s ease-in-out infinite' }} />
+            AI INSIGHTS
           </div>
-          <div className="flex flex-col">
-            {[
-              { label: 'AI Latency',       val: isLive ? `${latencyVal}ms` : '—',    color: isLive ? latencyColor : 'var(--text-3)' },
-              { label: 'Analysis Rate',    val: isLive ? 'every 2s' : '—',           color: isLive ? 'var(--text-1)' : 'var(--text-3)' },
-              { label: 'Faces Detected',   val: isLive ? String(stats.headcount) : '—', color: isLive ? 'var(--brand)' : 'var(--text-3)' },
-              { label: 'Attention Rate',   val: stats.attentionRate != null ? `${stats.attentionRate}%` : '—', color: stats.attentionRate != null ? (stats.attentionRate > 70 ? '#10b981' : stats.attentionRate > 40 ? '#f59e0b' : '#ef4444') : 'var(--text-3)' },
-              { label: 'Dominant Emotion', val: stats.dominantEmotion ?? '—',         color: stats.dominantEmotion ? (EMOTION_COLORS[stats.dominantEmotion] ?? 'var(--text-1)') : 'var(--text-3)' },
-              { label: 'Last Updated',     val: lastUpdated || '—',                   color: 'var(--text-2)' },
-            ].map(row => (
-              <div key={row.label} className="metric-row">
-                <span style={{ color: 'rgba(255,255,255,0.40)', fontSize: 10 }}>{row.label}</span>
-                <span className="font-mono text-[11px] font-semibold" style={{ color: row.color }}>{row.val}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {insights.slice(0, 5).map((ins, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, flexShrink: 0, marginTop: 1, color: ins.color, width: 14, textAlign: 'center' }}>{ins.icon}</span>
+                <span style={{ fontSize: 11, lineHeight: 1.4, color: 'rgba(255,255,255,0.65)' }}>{ins.text}</span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* ── Section 4: Recent Alerts ─────────────────────────── */}
-        <div className="px-4 py-3">
+        {/* System Status */}
+        <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border-0)' }}>
           <div className="section-header-ent">
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#ef4444' }} />
-            RECENT ALERTS
+            <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />
+            REAL-TIME SYSTEM STATUS
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 10 }}>
+            <CircularGauge value={sysMetrics.gpu} label="GPU" color="#3b82f6" />
+            <CircularGauge value={sysMetrics.cpu} label="CPU" color="#10b981" />
+            <CircularGauge value={sysMetrics.memory} label="Mem" color="#f59e0b" />
+            <CircularGauge value={sysMetrics.storage} label="Disk" color="#8b5cf6" />
+          </div>
+          {[
+            { label: 'AI Latency',     val: isLive ? `${latencyVal}ms` : '—', color: isLive ? latencyColor : 'var(--text-3)' },
+            { label: 'Analysis Rate',  val: isLive ? 'every 2s' : '—',        color: isLive ? 'var(--text-1)' : 'var(--text-3)' },
+            { label: 'Faces Detected', val: isLive ? String(stats.headcount) : '—', color: isLive ? 'var(--brand)' : 'var(--text-3)' },
+            { label: 'Last Updated',   val: lastUpdated || '—',               color: 'var(--text-2)' },
+          ].map(row => (
+            <div key={row.label} className="metric-row">
+              <span style={{ color: 'rgba(255,255,255,0.38)', fontSize: 10 }}>{row.label}</span>
+              <span style={{ fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 600, color: row.color }}>{row.val}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Active Alerts */}
+        <div style={{ padding: '12px 14px' }}>
+          <div className="section-header-ent">
+            <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#ef4444', flexShrink: 0 }} />
+            ACTIVE ALERTS
             {panelAlerts.length > 0 && (
-              <span className="ml-auto text-[8px] font-bold px-1.5 py-0.5 rounded-full"
-                    style={{ background: 'rgba(239,68,68,0.18)', color: '#f87171', border: '1px solid rgba(239,68,68,0.30)' }}>
-                {panelAlerts.length}
-              </span>
+              <span className="badge badge-red" style={{ marginLeft: 'auto', fontSize: 9 }}>{panelAlerts.length}</span>
             )}
           </div>
           {panelAlerts.length === 0 ? (
-            <div className="flex items-center gap-2 py-2">
-              <span className="text-[10px] font-bold" style={{ color: '#10b981' }}>✓</span>
-              <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.35)' }}>No active alerts</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#10b981' }}>
+              <span>✓</span>
+              <span style={{ color: 'rgba(255,255,255,0.35)' }}>No active alerts</span>
             </div>
           ) : (
-            <div className="flex flex-col gap-2">
-              {panelAlerts.map(alert => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {panelAlerts.slice(0, 3).map(alert => (
                 <div key={alert.id} className="alert-item">
-                  <span className="text-[11px] font-bold shrink-0 mt-0.5"
-                        style={{ color: alert.level === 'danger' ? '#f87171' : alert.level === 'warn' ? '#fbbf24' : '#60a5fa' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, flexShrink: 0, marginTop: 1, color: alert.level === 'danger' ? '#f87171' : alert.level === 'warn' ? '#fbbf24' : '#60a5fa' }}>
                     {alert.level === 'danger' ? '!' : alert.level === 'warn' ? '⚠' : '●'}
                   </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[10px] leading-snug truncate" style={{ color: 'rgba(255,255,255,0.65)' }}>{alert.message}</p>
-                    <p className="text-[9px] font-mono mt-0.5" style={{ color: 'rgba(255,255,255,0.25)' }}>{timeAgo(alert.time)}</p>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <p style={{ fontSize: 10, lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(255,255,255,0.65)' }}>{alert.message}</p>
+                    <p style={{ fontSize: 9, fontFamily: 'JetBrains Mono', marginTop: 2, color: 'rgba(255,255,255,0.25)' }}>{timeAgo(alert.time)}</p>
                   </div>
                 </div>
               ))}
+              {panelAlerts.length > 3 && (
+                <button style={{ fontSize: 10, color: '#60a5fa', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0' }}>
+                  View all {panelAlerts.length} alerts →
+                </button>
+              )}
             </div>
           )}
         </div>
+
       </div>
     </div>
   );
 }
 
+/* ── Dashboard ──────────────────────────────────────────────── */
 interface DashboardProps { onLiveStats?: (update: AnalysisUpdate) => void; }
 
 export default function Dashboard({ onLiveStats }: DashboardProps) {
@@ -297,14 +376,14 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
 
   const { isDemoMode } = useDemoMode();
 
-  // ── Demo mode state ──────────────────────────────────────────
   const [mockSession, setMockSession]   = useState<Session | null>(null);
   const [demoAlerts, setDemoAlerts]     = useState<AlertRecord[]>([]);
   const prevDemoAlert                   = useRef<string | null>(null);
 
-  // Panel alerts collected from live feed
   const [panelAlerts, setPanelAlerts]   = useState<PanelAlert[]>([]);
   const [lastUpdated, setLastUpdated]   = useState('');
+  const [sysMetrics] = useState({ gpu: 45, cpu: 38, memory: 62, storage: 71 });
+  const sparkHistory = useRef<Map<string, number[]>>(new Map());
 
   useEffect(() => {
     if (isDemoMode) {
@@ -345,6 +424,11 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
     pedagogicalNote: string | null; faceEmotions: Array<{ emotion: string; attention: boolean; confidence: number }>;
   }>({ emotionBreakdown: null, dominantEmotion: null, pedagogicalNote: null, faceEmotions: [] });
 
+  const pushSpark = (key: string, value: number) => {
+    const prev = sparkHistory.current.get(key) ?? [];
+    sparkHistory.current.set(key, [...prev.slice(-7), value]);
+  };
+
   const handleRtspThumbnail = useCallback((thumbnail: string) => {
     if (!activeSlotKey) return;
     setSlots(prev => prev.map(s => s.key === activeSlotKey ? { ...s, thumbnail } : s));
@@ -374,7 +458,11 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
         sentiment: update.sentiment,
       }]);
     }
-    // Collect panel alerts
+    pushSpark('headcount', Math.round((update.headcount / ROOM_CAPACITY) * 100));
+    pushSpark('attention', update.attentionRate ?? 0);
+    pushSpark('engagement', update.engagement);
+    pushSpark('alerts', update.alert ? 100 : 0);
+
     if (update.alert) {
       setPanelAlerts(prev => {
         const newAlert: PanelAlert = {
@@ -443,446 +531,220 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
     setSlots(prev => prev.filter(s => s.key !== key));
   };
 
-  const activeSession  = isDemoMode ? mockSession : currentSession;
+  const activeSession   = isDemoMode ? mockSession : currentSession;
   const sessionDuration = activeSession ? formatElapsed(activeSession.started_at) : undefined;
-  const isLive         = isDemoMode || !!activeSlotKey;
+  const isLive          = isDemoMode || !!activeSlotKey;
+  const engColor        = stats.engagement > 79 ? 'var(--success)' : stats.engagement > 49 ? 'var(--warning)' : stats.engagement > 0 ? 'var(--danger)' : 'var(--text-3)';
+  const getSpark        = (key: string) => sparkHistory.current.get(key) ?? [];
 
-  const engColor = stats.engagement > 79 ? 'var(--success)' : stats.engagement > 49 ? 'var(--warning)' : stats.engagement > 0 ? 'var(--danger)' : 'var(--text-3)';
-  const insights = buildInsights(stats);
+  const attSub      = stats.attentionRate == null ? 'No feed' : stats.attentionRate > 70 ? 'Excellent' : stats.attentionRate > 40 ? 'Good' : 'Poor';
+  const attSubColor = stats.attentionRate == null ? 'var(--text-3)' : stats.attentionRate > 70 ? '#10b981' : stats.attentionRate > 40 ? '#f59e0b' : '#ef4444';
+  const engSub      = stats.engagement === 0 ? 'No feed' : stats.engagement > 70 ? 'Very Good' : stats.engagement > 40 ? 'Good' : 'Low';
+  const engSubColor = stats.engagement === 0 ? 'var(--text-3)' : engColor;
 
-  /* ── KPI definitions ──────────────────────────────────────── */
-  const kpis = [
+  const kpiCards: KpiCardProps[] = [
     {
-      label: 'Students', value: stats.headcount ? `${stats.headcount}` : '—',
-      color: 'var(--brand)', accent: 'linear-gradient(90deg,#3b82f6,#6366f1)',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
-            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      ),
-      sub: stats.headcount ? `of ${ROOM_CAPACITY} capacity` : 'No feed active',
-      bar: stats.headcount ? Math.round(stats.headcount / ROOM_CAPACITY * 100) : 0,
+      label: 'Students Present',
+      value: `${stats.headcount}/${ROOM_CAPACITY}`,
+      sub: stats.headcount ? `${Math.round(stats.headcount / ROOM_CAPACITY * 100)}% occupancy` : 'No feed active',
+      subColor: stats.headcount ? '#60a5fa' : 'var(--text-3)',
+      accent: '#3b82f6',
+      sparkData: getSpark('headcount'),
+      icon: (<svg width={14} height={14} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>),
     },
     {
-      label: 'Lecturer',
-      value: stats.headcount > 0 ? (stats.lecturerPresent ? 'Present' : 'Absent') : '—',
-      color: stats.headcount > 0 ? (stats.lecturerPresent ? 'var(--success)' : 'var(--warning)') : 'var(--text-3)',
-      accent: stats.headcount > 0 ? (stats.lecturerPresent ? 'linear-gradient(90deg,#10b981,#059669)' : 'linear-gradient(90deg,#f59e0b,#d97706)') : 'linear-gradient(90deg,#1e3a5f,#1e3a5f)',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
-            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-        </svg>
-      ),
-      sub: 'Supervisor presence',
-      bar: stats.lecturerPresent ? 100 : 0,
-    },
-    {
-      label: 'Attention',
+      label: 'Attention Score',
       value: stats.attentionRate != null ? `${stats.attentionRate}%` : '—',
-      color: stats.attentionRate != null ? (stats.attentionRate > 70 ? 'var(--success)' : stats.attentionRate > 40 ? 'var(--warning)' : 'var(--danger)') : 'var(--text-3)',
-      accent: 'linear-gradient(90deg,#22d3ee,#06b6d4)',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
-            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-        </svg>
-      ),
-      sub: stats.attentionRate != null ? 'Face attention rate' : 'No feed active',
-      bar: stats.attentionRate ?? 0,
+      sub: attSub, subColor: attSubColor, accent: '#10b981',
+      sparkData: getSpark('attention'),
+      icon: (<svg width={14} height={14} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>),
     },
     {
-      label: 'Engagement',
+      label: 'Engagement Score',
       value: stats.engagement ? `${stats.engagement}%` : '—',
-      color: engColor,
-      accent: stats.engagement > 79 ? 'linear-gradient(90deg,#10b981,#06b6d4)' : stats.engagement > 49 ? 'linear-gradient(90deg,#f59e0b,#fb923c)' : stats.engagement > 0 ? 'linear-gradient(90deg,#ef4444,#f97316)' : 'linear-gradient(90deg,#1e3a5f,#1e3a5f)',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-      ),
-      sub: stats.engagement > 0 ? (stats.engagement > 70 ? 'Strong signal' : stats.engagement > 40 ? 'Moderate' : 'Low signal') : 'No feed active',
-      bar: stats.engagement,
+      sub: engSub, subColor: engSubColor, accent: '#f59e0b',
+      sparkData: getSpark('engagement'),
+      icon: (<svg width={14} height={14} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>),
     },
     {
-      label: 'Sentiment',
-      value: stats.sentiment,
-      color: stats.sentiment === 'Positive' ? 'var(--success)' : stats.sentiment === 'Negative' ? 'var(--danger)' : stats.sentiment !== '—' ? 'var(--text-1)' : 'var(--text-3)',
-      accent: 'linear-gradient(90deg,#a78bfa,#6366f1)',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
-            d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
+      label: 'Class Sentiment',
+      value: stats.sentiment !== '—' ? stats.sentiment : '—',
       sub: stats.dominantEmotion ? `Dominant: ${stats.dominantEmotion}` : 'Class mood',
-      bar: stats.sentiment === 'Positive' ? 80 : stats.sentiment === 'Negative' ? 20 : stats.sentiment !== '—' ? 50 : 0,
+      subColor: stats.sentiment === 'Positive' ? '#10b981' : stats.sentiment === 'Negative' ? '#ef4444' : 'var(--text-3)',
+      accent: '#8b5cf6',
+      icon: (<svg width={14} height={14} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>),
     },
     {
-      label: 'Alert',
-      value: stats.alert ? stats.alert.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase()) : (stats.headcount > 0 ? 'None' : '—'),
-      color: stats.alert ? 'var(--danger)' : stats.headcount > 0 ? 'var(--success)' : 'var(--text-3)',
-      accent: stats.alert ? 'linear-gradient(90deg,#ef4444,#ec4899)' : stats.headcount > 0 ? 'linear-gradient(90deg,#10b981,#059669)' : 'linear-gradient(90deg,#1e3a5f,#1e3a5f)',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
-            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-        </svg>
-      ),
-      sub: stats.alert ? 'Action required' : (stats.headcount > 0 ? 'All clear' : 'System idle'),
-      bar: stats.alert ? 100 : 0,
+      label: 'Lecturer Present',
+      value: stats.headcount > 0 ? (stats.lecturerPresent ? 'Present' : 'Absent') : '—',
+      sub: stats.headcount > 0 ? (stats.lecturerPresent ? 'Active' : 'Inactive') : 'No feed',
+      subColor: stats.headcount > 0 ? (stats.lecturerPresent ? '#10b981' : '#f59e0b') : 'var(--text-3)',
+      accent: '#06b6d4',
+      icon: (<svg width={14} height={14} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>),
+    },
+    {
+      label: 'Active Alerts',
+      value: String(panelAlerts.length),
+      sub: panelAlerts.length > 0 ? 'Action required' : 'All clear',
+      subColor: panelAlerts.length > 0 ? '#ef4444' : '#10b981',
+      accent: panelAlerts.length > 0 ? '#ef4444' : '#10b981',
+      sparkData: getSpark('alerts'),
+      icon: (<svg width={14} height={14} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>),
     },
   ];
 
   return (
-    <div className="flex h-full w-full transition-theme" style={{ background: 'var(--surface-0)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: 'var(--surface-0)' }}>
 
-      {/* ── CENTER: main dashboard content ──────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-auto">
-
-        {/* Demo banner */}
+      {/* ── KPI Row ──────────────────────────────────────────────── */}
+      <div style={{ padding: '10px 14px 8px', borderBottom: '1px solid var(--border-0)', background: 'var(--surface-1)', flexShrink: 0 }}>
         {isDemoMode && (
-          <div className="px-5 py-2 flex items-center gap-3 shrink-0"
-               style={{ background: 'rgba(245,158,11,0.08)', borderBottom: '1px solid rgba(245,158,11,0.25)' }}>
-            <span className="w-1.5 h-1.5 rounded-full live-dot" style={{ background: '#f59e0b' }} />
-            <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#fbbf24' }}>
-              Demo Mode Active — Simulated Data
-            </span>
-            <span className="hidden md:inline text-[9px]" style={{ color: 'rgba(251,191,36,0.55)' }}>
-              All data is synthetic · No real cameras or API calls
-            </span>
-            <span className="ml-auto text-[9px] font-mono px-2 py-0.5 rounded-md"
-                  style={{ background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.30)', color: '#fbbf24' }}>
-              CS302 · Dr. Sarah Chen
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '5px 10px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)' }}>
+            <span className="live-dot" style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#f59e0b', flexShrink: 0 }} />
+            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#fbbf24' }}>Demo Mode — Simulated Data</span>
+            <span style={{ fontSize: 9, color: 'rgba(251,191,36,0.50)', marginLeft: 4 }}>CS302 · Dr. Sarah Chen</span>
           </div>
         )}
-
-        {/* Session banner */}
-        <div className="px-5 py-2.5 shrink-0 flex items-center justify-between gap-3 relative"
-             style={{ background: 'var(--surface-1)', borderBottom: '1px solid var(--border-0)' }}>
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-2)' }}>Room 402-B</span>
-            {isLive && (
-              <>
-                <div className="w-px h-3" style={{ background: 'var(--border-1)' }} />
-                <div className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full live-dot" style={{ background: isDemoMode ? '#f59e0b' : 'var(--success)' }} />
-                  <span className="text-[10px] font-semibold" style={{ color: isDemoMode ? '#fbbf24' : 'var(--success)' }}>
-                    {isDemoMode ? 'DEMO' : 'LIVE'}
-                  </span>
-                </div>
-                {sessionDuration && (
-                  <>
-                    <div className="w-px h-3" style={{ background: 'var(--border-1)' }} />
-                    <span className="text-[10px] font-mono" style={{ color: 'var(--text-2)' }}>{sessionDuration}</span>
-                  </>
-                )}
-                {stats.engagement > 0 && (
-                  <>
-                    <div className="w-px h-3" style={{ background: 'var(--border-1)' }} />
-                    <span className="text-[10px] font-mono font-bold" style={{ color: engColor }}>{stats.engagement}% engagement</span>
-                  </>
-                )}
-              </>
-            )}
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-[9px] font-mono px-2 py-1 rounded-lg"
-                  style={{ background: 'var(--surface-2)', color: 'var(--text-3)', border: '1px solid var(--border-0)' }}>
-              Gemini 2.0 · HSEmotion · YOLOv11
-            </span>
-            {!isDemoMode && activeSlotKey && (
-              <button
-                onClick={stopActive}
-                className="px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all"
-                style={{ background: 'var(--danger-dim)', border: '1px solid rgba(239,68,68,0.40)', color: 'var(--danger)' }}
-                onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.20)')}
-                onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = 'var(--danger-dim)')}
-              >
-                Stop Feed
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Camera Source Strip (hidden in demo mode) */}
-        <div className={`px-5 pt-4 pb-0 shrink-0 ${isDemoMode ? 'hidden' : ''}`}>
-          <div className="section-label mb-3">
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--brand)', boxShadow: '0 0 6px var(--brand-glow)' }} />
-            Live Feeds
-          </div>
-          <div className="flex items-center gap-3 overflow-x-auto pb-3 no-scrollbar">
-            {slots.map(slot => {
-              const style   = SLOT_STYLE[slot.type];
-              const isActive = activeSlotKey === slot.key;
-              const hasUrl   = slot.type !== 'webcam' && slot.type !== 'upload' ? !!slot.url : true;
-              return (
-                <div
-                  key={slot.key}
-                  className={`relative flex-shrink-0 cursor-pointer group cam-card${isActive ? ' active' : ''}`}
-                  style={{ width: 180 }}
-                  onClick={() => activateSlot(slot)}
-                >
-                  <div
-                    className="overflow-hidden relative transition-all duration-200"
-                    style={{
-                      height: 110,
-                      background: 'var(--surface-2)',
-                      borderRadius: 'var(--radius-md)',
-                      border: `2px solid ${isActive ? style.border : 'var(--border-0)'}`,
-                      boxShadow: isActive ? `0 0 0 3px ${style.glow}, var(--shadow-md)` : 'var(--shadow-sm)',
-                    }}
-                  >
-                    {slot.thumbnail && isActive ? (
-                      <img src={slot.thumbnail} alt={slot.label} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center gap-2"
-                           style={{ background: isActive ? `${style.border}12` : 'transparent', color: isActive ? style.text : 'var(--text-3)' }}>
-                        <SlotTypeIcon type={slot.type} size={24} />
-                        {!hasUrl && <span className="text-[9px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-3)' }}>Click to configure</span>}
-                      </div>
-                    )}
-                    {/* Status badge top-left */}
-                    <div className="absolute top-2 left-2">
-                      {isActive ? (
-                        <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold text-white uppercase ${style.badge}`}>
-                          <span className="w-1 h-1 rounded-full bg-white live-dot" /> Live
-                        </span>
-                      ) : (
-                        <span className="flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase"
-                              style={{ background: 'rgba(0,0,0,0.60)', color: 'rgba(255,255,255,0.40)' }}>Idle</span>
-                      )}
-                    </div>
-                    {/* Resolution/FPS chip bottom-left */}
-                    <div className="absolute bottom-2 left-2">
-                      <span className="px-1.5 py-0.5 rounded-md text-[8px] font-mono uppercase"
-                            style={{ background: 'rgba(0,0,0,0.60)', color: style.text }}>{slot.type}</span>
-                    </div>
-                    {/* AI badge bottom-right */}
-                    {isActive && (
-                      <div className="absolute bottom-2 right-2">
-                        <span className="px-1.5 py-0.5 rounded-md text-[8px] font-bold uppercase"
-                              style={{ background: 'rgba(167,139,250,0.25)', color: '#c4b5fd', border: '1px solid rgba(167,139,250,0.30)' }}>AI</span>
-                      </div>
-                    )}
-                    {/* Remove button */}
-                    {!slot.isFixed && !isActive && (
-                      <button
-                        className="absolute top-2 right-2 w-5 h-5 rounded-full bg-black/60 text-white/50 hover:text-red-400 text-xs hidden group-hover:flex items-center justify-center"
-                        onClick={e => { e.stopPropagation(); removeSlot(slot.key); }}>
-                        ×
-                      </button>
-                    )}
-                    {slot.type === 'rtsp' && slot.url && !isActive && (
-                      <button
-                        className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded text-[8px] font-mono hidden group-hover:block"
-                        style={{ background: 'rgba(0,0,0,0.65)', color: 'rgba(255,255,255,0.50)' }}
-                        onClick={e => { e.stopPropagation(); setUrlModal({ slotKey: slot.key, current: slot.url }); setUrlInput(slot.url ?? ''); }}>
-                        edit
-                      </button>
-                    )}
-                  </div>
-                  <div className="mt-1.5 px-0.5">
-                    <p className="text-[11px] font-semibold truncate" style={{ color: isActive ? 'var(--text-0)' : 'var(--text-1)' }}>{slot.label}</p>
-                    <p className="text-[9px] truncate" style={{ color: 'var(--text-3)', maxWidth: 175 }}>{slot.url ? slot.url : slot.sublabel}</p>
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* Add RTSP camera */}
-            <div className="flex-shrink-0 cursor-pointer" style={{ width: 180 }}
-                 onClick={() => { setAddRtspModal(true); setUrlInput(''); setNewCamLabel(''); }}>
-              <div className="flex flex-col items-center justify-center gap-2 transition-all"
-                   style={{ height: 110, border: '2px dashed var(--border-1)', background: 'transparent', borderRadius: 'var(--radius-md)' }}
-                   onMouseEnter={e => ((e.currentTarget as HTMLElement).style.borderColor = 'rgba(59,130,246,0.40)')}
-                   onMouseLeave={e => ((e.currentTarget as HTMLElement).style.borderColor = 'var(--border-1)')}>
-                <svg className="w-5 h-5" style={{ color: 'var(--text-3)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 4v16m8-8H4" />
-                </svg>
-                <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-3)' }}>Add RTSP Camera</span>
-              </div>
-              <div className="mt-1.5 px-0.5">
-                <p className="text-[11px] font-semibold" style={{ color: 'var(--text-2)' }}>New Feed</p>
-                <p className="text-[9px]" style={{ color: 'var(--text-3)' }}>RTSP / IP camera</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* AI Insights strip */}
-        <div className="mx-5 mb-3 rounded-2xl px-4 py-3 flex items-start gap-3 relative overflow-hidden"
-             style={{ background: 'linear-gradient(135deg,var(--surface-2) 0%,var(--surface-3) 100%)', border: '1px solid rgba(99,102,241,0.22)', boxShadow: '0 0 20px rgba(99,102,241,0.06)' }}>
-          <div className="absolute top-0 left-0 right-0 h-px"
-               style={{ background: 'linear-gradient(90deg,transparent,var(--indigo),var(--brand),transparent)', opacity: 0.6 }} />
-          <div className="shrink-0 flex items-center gap-2 mr-1 mt-0.5">
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg"
-                 style={{ background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(99,102,241,0.28)' }}>
-              <span className="w-1.5 h-1.5 rounded-full neon-pulse" style={{ background: '#a78bfa', boxShadow: '0 0 6px rgba(167,139,250,0.60)' }} />
-              <span className="text-[9px] font-black uppercase tracking-[0.16em]" style={{ color: '#a78bfa' }}>AI</span>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2 min-w-0">
-            {insights.map((ins, i) => (
-              <span key={i} className="insight-chip">
-                <span className="font-bold" style={{ color: ins.color, fontSize: 11 }}>{ins.icon}</span>
-                <span>{ins.text}</span>
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* KPI Row */}
-        <div className="px-5 mb-4 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
-          {kpis.map(kpi => (
-            <div key={kpi.label} className="kpi-card" style={{ '--kpi-accent': kpi.accent } as React.CSSProperties}>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[9px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-2)' }}>{kpi.label}</span>
-                <span style={{ color: kpi.color, opacity: 0.65 }}>{kpi.icon}</span>
-              </div>
-              <p className="font-black leading-none mb-2 font-mono" style={{ fontSize: 22, color: kpi.color, letterSpacing: '-0.04em' }}>{kpi.value}</p>
-              <div className="eng-bar mb-2">
-                <div className="eng-bar-fill" style={{ width: `${kpi.bar}%`, background: kpi.accent }} />
-              </div>
-              <p className="text-[9px] font-mono truncate" style={{ color: 'var(--text-3)' }}>{kpi.sub}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Main content grid */}
-        <div className="flex-1 px-5 pb-5 flex flex-col gap-4 min-h-0">
-
-          {/* Row 1: video + right analytics */}
-          <div className="flex flex-col xl:flex-row gap-4" style={{ minHeight: 420 }}>
-            {/* Video feed */}
-            <div className="flex-1 min-w-0">
-              {isDemoMode ? (
-                <MockFeedPanel
-                  faceEmotions={liveEmotionData.faceEmotions}
-                  headcount={stats.headcount}
-                  engagement={stats.engagement}
-                  isRunning={isDemoMode}
-                />
-              ) : (
-                <RoomCard
-                  name="Room 402-B / Main Stage"
-                  capacity={ROOM_CAPACITY}
-                  roomId={ROOM_ID}
-                  sessionId={currentSession?.id}
-                  onStatsUpdate={handleStatsUpdate}
-                  triggerSource={trigger}
-                  onRtspThumbnail={handleRtspThumbnail}
-                  externalFileInput={fileInputRef}
-                />
-              )}
-            </div>
-
-            {/* Right analytics column */}
-            <div className="xl:w-[290px] flex flex-col gap-3 shrink-0">
-              <div className="flex-1 min-h-0">
-                <LiveEmotionPanel
-                  emotionBreakdown={liveEmotionData.emotionBreakdown}
-                  dominantEmotion={liveEmotionData.dominantEmotion}
-                  pedagogicalNote={liveEmotionData.pedagogicalNote}
-                  faceEmotions={liveEmotionData.faceEmotions}
-                  isLive={isLive}
-                />
-              </div>
-              <div className="shrink-0">
-                <SessionPanel
-                  currentSession={activeSession}
-                  roomId={ROOM_ID}
-                  onSessionStart={isDemoMode ? setMockSession : setCurrentSession}
-                  onSessionEnd={isDemoMode ? () => setMockSession(buildMockSession()) : () => setCurrentSession(null)}
-                  demoMode={isDemoMode}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Row 2: charts */}
-          <div className="section-label mb-1">
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--indigo)', boxShadow: '0 0 6px rgba(99,102,241,0.60)' }} />
-            Analytics
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-            <div className="xl:col-span-2"><EmotionTimelineChart data={emotionHistory} /></div>
-            <div className="xl:col-span-1"><EngagementChart data={engHistory} sessionDuration={sessionDuration} /></div>
-            <div className="xl:col-span-1"><GestureBreakdown gestures={lastGestures} /></div>
-          </div>
-
-          {/* Alerts */}
-          <AlertLog
-            roomId={ROOM_ID}
-            sessionId={activeSession?.id}
-            demoMode={isDemoMode}
-            demoAlerts={demoAlerts}
-            onDemoAlertDismiss={(id) => setDemoAlerts(prev => prev.filter(a => a.id !== id))}
-            onDemoAlertDismissAll={() => setDemoAlerts([])}
-          />
-
-          {/* Footer */}
-          <div className="rounded-2xl px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-1 relative overflow-hidden"
-               style={{ background: 'var(--surface-1)', border: '1px solid var(--border-0)' }}>
-            <div className="absolute top-0 left-0 right-0 h-px"
-                 style={{ background: 'linear-gradient(90deg,transparent,var(--brand),var(--indigo),var(--cyan),transparent)', opacity: 0.30 }} />
-            {[
-              { label: 'Platform', val: 'EduSphere AI v4' },
-              { label: 'Models',   val: 'Gemini 2.0 · HSEmotion B2 · YOLOv11-Pose · YOLO-World' },
-              { label: 'Room',     val: 'Room 402-B' },
-              { label: 'Capacity', val: `${ROOM_CAPACITY} seats` },
-              { label: 'License',  val: 'University Edition' },
-            ].map(f => (
-              <span key={f.label} className="flex items-center gap-1.5">
-                <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-3)' }}>{f.label}:</span>
-                <span className="text-[9px] font-mono" style={{ color: 'var(--text-2)' }}>{f.val}</span>
-              </span>
-            ))}
-          </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 8 }}>
+          {kpiCards.map(kpi => <KpiCard key={kpi.label} {...kpi} />)}
         </div>
       </div>
 
-      {/* ── RIGHT: Analytics Panel (fixed 300px) ─────────────────── */}
-      <RightAnalyticsPanel
-        stats={stats}
-        isLive={isLive}
-        panelAlerts={panelAlerts}
-        lastUpdated={lastUpdated}
-      />
+      {/* ── Content Row ──────────────────────────────────────────── */}
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
-      {/* Hidden file input */}
+        {/* CENTER COLUMN */}
+        <div className="thin-scroll" style={{ flex: 1, overflowY: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
+
+          {/* Live Camera Card */}
+          <div className="e-card" style={{ flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '7px 12px', borderBottom: '1px solid var(--border-0)', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              <span className="badge badge-red" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <span className="live-dot" style={{ display: 'inline-block', width: 5, height: 5, borderRadius: '50%', background: '#ef4444' }} />
+                LIVE
+              </span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-0)' }}>Live Classroom Feed — Room 402-B</span>
+              {isLive && sessionDuration && (
+                <span style={{ fontSize: 10, fontFamily: 'JetBrains Mono', color: 'var(--text-3)', marginLeft: 4 }}>{sessionDuration}</span>
+              )}
+              {stats.engagement > 0 && (
+                <span style={{ fontSize: 10, fontFamily: 'JetBrains Mono', fontWeight: 700, color: engColor, marginLeft: 4 }}>{stats.engagement}% ENG</span>
+              )}
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+                <span style={{ fontSize: 9, fontFamily: 'JetBrains Mono', padding: '3px 8px', borderRadius: 6, background: 'var(--surface-3)', color: 'var(--text-3)', border: '1px solid var(--border-0)' }}>
+                  Gemini 2.0 · HSEmotion · YOLO
+                </span>
+                {!isDemoMode && activeSlotKey && (
+                  <button onClick={stopActive} style={{ fontSize: 9, fontWeight: 700, padding: '3px 10px', borderRadius: 7, background: 'var(--danger-dim)', border: '1px solid rgba(239,68,68,0.40)', color: 'var(--danger)', cursor: 'pointer' }}>
+                    Stop Feed
+                  </button>
+                )}
+              </div>
+            </div>
+            <div style={{ minHeight: 300 }}>
+              {isDemoMode ? (
+                <MockFeedPanel faceEmotions={liveEmotionData.faceEmotions} headcount={stats.headcount} engagement={stats.engagement} isRunning={isDemoMode} />
+              ) : (
+                <RoomCard name="Room 402-B / Main Stage" capacity={ROOM_CAPACITY} roomId={ROOM_ID} sessionId={currentSession?.id} onStatsUpdate={handleStatsUpdate} triggerSource={trigger} onRtspThumbnail={handleRtspThumbnail} externalFileInput={fileInputRef} />
+              )}
+            </div>
+          </div>
+
+          {/* Camera slot strip (hidden in demo) */}
+          {!isDemoMode && (
+            <div className="no-scroll" style={{ display: 'flex', gap: 8, overflowX: 'auto', flexShrink: 0, paddingBottom: 4 }}>
+              {slots.map(slot => {
+                const slotS    = SLOT_STYLE[slot.type];
+                const isActive = activeSlotKey === slot.key;
+                const hasUrl   = slot.type !== 'webcam' && slot.type !== 'upload' ? !!slot.url : true;
+                return (
+                  <div key={slot.key} className={`cam-card${isActive ? ' active' : ''}`} style={{ width: 152, flexShrink: 0, cursor: 'pointer' }} onClick={() => activateSlot(slot)}>
+                    <div style={{ height: 80, background: 'var(--surface-2)', position: 'relative', overflow: 'hidden', border: isActive ? `2px solid ${slotS.border}` : '2px solid transparent', boxShadow: isActive ? `0 0 0 2px ${slotS.glow}` : 'none' }}>
+                      {slot.thumbnail && isActive ? (
+                        <img src={slot.thumbnail} alt={slot.label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, background: isActive ? `${slotS.border}10` : 'transparent', color: isActive ? slotS.text : 'var(--text-3)' }}>
+                          <SlotTypeIcon type={slot.type} size={20} />
+                          {!hasUrl && <span style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-3)' }}>Click to configure</span>}
+                        </div>
+                      )}
+                      <span style={{ position: 'absolute', top: 4, left: 4, fontSize: 8, padding: '2px 5px', borderRadius: 4, background: isActive ? slotS.border : 'rgba(0,0,0,0.6)', color: 'rgba(255,255,255,0.85)', fontWeight: 700, textTransform: 'uppercase' }}>
+                        {isActive ? 'LIVE' : 'IDLE'}
+                      </span>
+                      <div style={{ position: 'absolute', top: 4, right: 4, width: 7, height: 7, borderRadius: '50%', background: isActive ? '#10b981' : 'rgba(255,255,255,0.18)' }} />
+                      {!slot.isFixed && !isActive && (
+                        <button style={{ position: 'absolute', top: 4, right: 4, width: 16, height: 16, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', color: 'rgba(255,255,255,0.5)', border: 'none', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={e => { e.stopPropagation(); removeSlot(slot.key); }}>×</button>
+                      )}
+                    </div>
+                    <div style={{ padding: '5px 6px' }}>
+                      <p style={{ fontSize: 10, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isActive ? 'var(--text-0)' : 'var(--text-1)' }}>{slot.label}</p>
+                      <p style={{ fontSize: 8, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{slot.url ? slot.url : slot.sublabel}</p>
+                    </div>
+                  </div>
+                );
+              })}
+              <div style={{ width: 152, flexShrink: 0, cursor: 'pointer', borderRadius: 10, border: '2px dashed var(--border-1)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, minHeight: 106 }} onClick={() => { setAddRtspModal(true); setUrlInput(''); setNewCamLabel(''); }}>
+                <svg style={{ color: 'var(--text-3)' }} width={16} height={16} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 4v16m8-8H4" /></svg>
+                <span style={{ fontSize: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-3)' }}>Add RTSP</span>
+              </div>
+            </div>
+          )}
+
+          {/* Session Panel */}
+          <div style={{ flexShrink: 0 }}>
+            <SessionPanel currentSession={activeSession} roomId={ROOM_ID} onSessionStart={isDemoMode ? setMockSession : setCurrentSession} onSessionEnd={isDemoMode ? () => setMockSession(buildMockSession()) : () => setCurrentSession(null)} demoMode={isDemoMode} />
+          </div>
+
+          {/* Bottom charts */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, flexShrink: 0 }}>
+            <div className="e-card" style={{ padding: 12 }}>
+              <EngagementChart data={engHistory} sessionDuration={sessionDuration} />
+            </div>
+            <div className="e-card" style={{ padding: 12 }}>
+              <EmotionTimelineChart data={emotionHistory} />
+            </div>
+          </div>
+
+          {/* Gesture Breakdown */}
+          <div style={{ flexShrink: 0 }}>
+            <GestureBreakdown gestures={lastGestures} />
+          </div>
+
+          {/* Alert Log */}
+          <div style={{ flexShrink: 0 }}>
+            <AlertLog roomId={ROOM_ID} sessionId={activeSession?.id} demoMode={isDemoMode} demoAlerts={demoAlerts} onDemoAlertDismiss={(id) => setDemoAlerts(prev => prev.filter(a => a.id !== id))} onDemoAlertDismissAll={() => setDemoAlerts([])} />
+          </div>
+
+          {/* LiveEmotionPanel */}
+          <div style={{ flexShrink: 0 }}>
+            <LiveEmotionPanel emotionBreakdown={liveEmotionData.emotionBreakdown} dominantEmotion={liveEmotionData.dominantEmotion} pedagogicalNote={liveEmotionData.pedagogicalNote} faceEmotions={liveEmotionData.faceEmotions} isLive={isLive} />
+          </div>
+        </div>
+
+        {/* RIGHT PANEL */}
+        <RightAnalyticsPanel stats={stats} isLive={isLive} panelAlerts={panelAlerts} lastUpdated={lastUpdated} sysMetrics={sysMetrics} />
+      </div>
+
+      {/* Footer */}
+      <div style={{ padding: '5px 16px', borderTop: '1px solid var(--border-0)', background: 'var(--surface-1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <span style={{ fontSize: 10, color: 'var(--text-3)' }}>
+          EduSphere AI Classroom Intelligence Platform · PDPA Compliant · Secure · AI Powered · Room 402-B · {ROOM_CAPACITY} seats
+        </span>
+      </div>
+
       <input ref={fileInputRef} type="file" accept="video/*" className="hidden" onChange={handleFileSelected} />
 
       {/* RTSP Configure modal */}
       {urlModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay">
-          <div className="w-full max-w-md rounded-2xl p-6 shadow-2xl fade-up"
-               style={{ background: 'var(--surface-2)', border: '1px solid var(--border-1)' }}>
+          <div className="w-full max-w-md rounded-2xl p-6 shadow-2xl fade-up" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-1)' }}>
             <h3 className="text-base font-bold mb-1" style={{ color: 'var(--text-0)' }}>Configure RTSP Camera</h3>
-            <p className="text-sm mb-4" style={{ color: 'var(--text-2)' }}>
-              Enter the RTSP or IP camera stream URL. Full AI analysis runs server-side.
-            </p>
-            <div className="mb-4 px-3 py-2 rounded-xl text-[11px] font-mono"
-                 style={{ background: 'var(--success-dim)', border: '1px solid rgba(16,185,129,0.35)', color: 'var(--success)' }}>
-              ✓ Results stream via SSE — zero browser latency
-            </div>
-            <input type="text" value={urlInput} onChange={e => setUrlInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && confirmRtspUrl()}
-              placeholder="rtsp://192.168.1.100:554/stream"
-              className="field font-mono text-sm mb-4" autoFocus />
+            <p className="text-sm mb-4" style={{ color: 'var(--text-2)' }}>Enter the RTSP or IP camera stream URL. Full AI analysis runs server-side.</p>
+            <div className="mb-4 px-3 py-2 rounded-xl text-[11px] font-mono" style={{ background: 'var(--success-dim)', border: '1px solid rgba(16,185,129,0.35)', color: 'var(--success)' }}>✓ Results stream via SSE — zero browser latency</div>
+            <input type="text" value={urlInput} onChange={e => setUrlInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && confirmRtspUrl()} placeholder="rtsp://192.168.1.100:554/stream" className="field font-mono text-sm mb-4" autoFocus />
             <div className="flex gap-3">
-              <button onClick={() => { setUrlModal(null); setUrlInput(''); }}
-                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
-                style={{ background: 'var(--surface-3)', border: '1px solid var(--border-1)', color: 'var(--text-1)' }}>
-                Cancel
-              </button>
-              <button onClick={confirmRtspUrl}
-                className="flex-1 px-4 py-2.5 rounded-xl text-white text-sm font-semibold transition-colors"
-                style={{ background: 'linear-gradient(135deg,#2563eb,#6366f1)' }}>
-                Connect
-              </button>
+              <button onClick={() => { setUrlModal(null); setUrlInput(''); }} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors" style={{ background: 'var(--surface-3)', border: '1px solid var(--border-1)', color: 'var(--text-1)' }}>Cancel</button>
+              <button onClick={confirmRtspUrl} className="flex-1 px-4 py-2.5 rounded-xl text-white text-sm font-semibold transition-colors" style={{ background: 'linear-gradient(135deg,#2563eb,#6366f1)' }}>Connect</button>
             </div>
           </div>
         </div>
@@ -891,35 +753,22 @@ export default function Dashboard({ onLiveStats }: DashboardProps) {
       {/* Add RTSP modal */}
       {addRtspModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay">
-          <div className="w-full max-w-md rounded-2xl p-6 shadow-2xl fade-up"
-               style={{ background: 'var(--surface-2)', border: '1px solid var(--border-1)' }}>
+          <div className="w-full max-w-md rounded-2xl p-6 shadow-2xl fade-up" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-1)' }}>
             <h3 className="text-base font-bold mb-1" style={{ color: 'var(--text-0)' }}>Add RTSP Camera</h3>
             <p className="text-sm mb-4" style={{ color: 'var(--text-2)' }}>Add a new IP or RTSP camera to the monitoring strip.</p>
             <div className="flex flex-col gap-3 mb-4">
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--text-2)' }}>Camera Label</label>
-                <input type="text" value={newCamLabel} onChange={e => setNewCamLabel(e.target.value)}
-                  placeholder="e.g. Lab Entrance" className="field text-sm" />
+                <input type="text" value={newCamLabel} onChange={e => setNewCamLabel(e.target.value)} placeholder="e.g. Lab Entrance" className="field text-sm" />
               </div>
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--text-2)' }}>RTSP URL</label>
-                <input type="text" value={urlInput} onChange={e => setUrlInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && addRtspSlot()}
-                  placeholder="rtsp://192.168.1.100:554/stream"
-                  className="field font-mono text-sm" autoFocus />
+                <input type="text" value={urlInput} onChange={e => setUrlInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addRtspSlot()} placeholder="rtsp://192.168.1.100:554/stream" className="field font-mono text-sm" autoFocus />
               </div>
             </div>
             <div className="flex gap-3">
-              <button onClick={() => { setAddRtspModal(false); setUrlInput(''); setNewCamLabel(''); }}
-                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium"
-                style={{ background: 'var(--surface-3)', border: '1px solid var(--border-1)', color: 'var(--text-1)' }}>
-                Cancel
-              </button>
-              <button onClick={addRtspSlot}
-                className="flex-1 px-4 py-2.5 rounded-xl text-white text-sm font-semibold"
-                style={{ background: 'linear-gradient(135deg,#2563eb,#6366f1)' }}>
-                Add Camera
-              </button>
+              <button onClick={() => { setAddRtspModal(false); setUrlInput(''); setNewCamLabel(''); }} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium" style={{ background: 'var(--surface-3)', border: '1px solid var(--border-1)', color: 'var(--text-1)' }}>Cancel</button>
+              <button onClick={addRtspSlot} className="flex-1 px-4 py-2.5 rounded-xl text-white text-sm font-semibold" style={{ background: 'linear-gradient(135deg,#2563eb,#6366f1)' }}>Add Camera</button>
             </div>
           </div>
         </div>
