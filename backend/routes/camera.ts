@@ -10,7 +10,7 @@ const router = Router();
 
 const DEEPFACE_API_URL = process.env.DEEPFACE_API_URL || "http://localhost:8000";
 const DEEPFACE_API_KEY = process.env.DEEPFACE_API_KEY || "";
-const POLL_INTERVAL_MS = 8_000;
+const POLL_INTERVAL_MS = 4_000; // fast — persistent sidecar connection makes each grab ~200ms
 
 const ALERT_LEVEL: Record<string, number> = {
   high_distraction: 2, low_attendance: 2, lecturer_absent: 3,
@@ -55,17 +55,26 @@ async function runGemini(frameB64: string): Promise<any | null> {
   }
 }
 
+// Per-room Gemini cycle staggering — run Gemini every 3rd poll only
+const roomCycles     = new Map<string, number>();
+const lastGeminiRes  = new Map<string, any>();
+const lastFrameB64   = new Map<string, string>();
+
 // ── Core per-tick poll function ────────────────────────────────────────────────
 async function pollRtspOnce(roomId: string, rtspUrl: string, sessionId: string | null) {
   const start = Date.now();
+  const cycle = (roomCycles.get(roomId) ?? 0) + 1;
+  roomCycles.set(roomId, cycle);
+  const runGeminiThisCycle = cycle % 3 === 0;
 
+  // Grab current frame + DeepFace analysis from sidecar
   let dfResult: any = null;
   try {
     const resp = await fetch(`${DEEPFACE_API_URL}/analyze/rtsp`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-api-key": DEEPFACE_API_KEY },
       body: JSON.stringify({ rtsp_url: rtspUrl, session_id: sessionId ?? "none", room_id: roomId }),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(15_000),
     });
     if (resp.ok) dfResult = await resp.json();
   } catch (err: any) {
@@ -81,10 +90,18 @@ async function pollRtspOnce(roomId: string, rtspUrl: string, sessionId: string |
     return;
   }
 
-  // Gemini analysis on the captured frame
-  let geminiResult: any = null;
-  if (dfResult.frame_b64) {
-    geminiResult = await runGemini(dfResult.frame_b64);
+  // Cache frame for use as Gemini input on next Gemini cycle
+  if (dfResult.frame_b64) lastFrameB64.set(roomId, dfResult.frame_b64);
+
+  // Gemini: run every 3rd cycle using the previous frame so it runs in parallel
+  // with the current DeepFace grab — keeps most cycles under 3 s
+  let geminiResult: any = lastGeminiRes.get(roomId) ?? null;
+  if (runGeminiThisCycle) {
+    const frameForGemini = lastFrameB64.get(roomId) ?? dfResult.frame_b64;
+    if (frameForGemini) {
+      geminiResult = await runGemini(frameForGemini);
+      if (geminiResult) lastGeminiRes.set(roomId, geminiResult);
+    }
   }
 
   const latencyMs = Date.now() - start;
@@ -209,6 +226,9 @@ router.post("/stop-polling", requireRole("operator"), async (req, res) => {
   if (!room_id) { res.status(400).json({ error: "room_id is required" }); return; }
 
   const stopped = stopPolling(room_id);
+  roomCycles.delete(room_id);
+  lastGeminiRes.delete(room_id);
+  lastFrameB64.delete(room_id);
   broadcastToRoom(room_id, "poll_stopped", { room_id, timestamp: new Date().toISOString() });
   res.json({ ok: true, was_active: stopped });
 });

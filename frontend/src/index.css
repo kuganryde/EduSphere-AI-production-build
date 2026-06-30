@@ -305,7 +305,14 @@ html.light .kpi-card { background: var(--surface-2); }
   font-family: 'JetBrains Mono', monospace;
   font-size: 26px; font-weight: 800; line-height: 1;
   letter-spacing: -0.04em;
+  transition: color 0.6s ease;
 }
+
+/* ── KPI metric value smooth transition ─────────────────────────── */
+.kpi-val {
+  transition: opacity 0.3s ease;
+}
+.kpi-val.updating { opacity: 0.6; }
 
 /* ── Top Navigation ─────────────────────────────────────────────── */
 .top-nav {

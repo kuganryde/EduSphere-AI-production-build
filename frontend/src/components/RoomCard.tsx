@@ -3,8 +3,9 @@ import { AnalysisUpdate, DetectedFace, DetectedPerson } from '../types';
 import { getAuthHeader } from '../context/AuthContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-const WEBCAM_INTERVAL_MS  = 5_000;   // local capture — fast
-const UPLOAD_INTERVAL_MS  = 6_000;   // video file
+const WEBCAM_INTERVAL_MS  = 3_000;   // local — DeepFace only cycles complete in ~1.5 s
+const UPLOAD_INTERVAL_MS  = 4_000;   // video file
+const GEMINI_EVERY_N      = 3;       // run Gemini every Nth cycle; others use cached result
 
 type SourceType = 'webcam' | 'youtube' | 'rtsp' | 'upload';
 interface Source { type: SourceType; url?: string; fileName?: string }
@@ -146,7 +147,9 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
   const sseRef          = useRef<EventSource | null>(null);
   const animFrameRef    = useRef<number>(0);
   const fileInputRef    = useRef<HTMLInputElement>(null);
-  const uploadObjRef    = useRef<string | null>(null); // object URL for cleanup
+  const uploadObjRef    = useRef<string | null>(null);
+  const cycleRef        = useRef<number>(0);            // analysis cycle counter
+  const lastGeminiRef   = useRef<any>(null);            // cached Gemini result between staggered calls
 
   // ── External trigger from Dashboard camera strip ──────────────
   useEffect(() => {
@@ -283,35 +286,51 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
     }
   }, [source]);
 
-  const captureFrame = useCallback((): string | null => {
+  const captureFrame = useCallback((maxWidth = 640): string | null => {
     const video = videoRef.current;
     const canvas = captureCanvasRef.current;
     if (!video || !canvas || video.readyState < 2) return null;
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
+    const vw = video.videoWidth || 640;
+    const vh = video.videoHeight || 480;
+    const scale = Math.min(1, maxWidth / vw);
+    canvas.width  = Math.round(vw * scale);
+    canvas.height = Math.round(vh * scale);
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
-    ctx.drawImage(video, 0, 0);
-    return canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.82).split(',')[1];
   }, []);
 
   const runWebcamAnalysis = useCallback(async () => {
-    const frame = captureFrame();
+    const frame = captureFrame(640); // 640 px wide — fast upload, sufficient for face detection
     if (!frame) return;
-    setLiveData(d => ({ ...d, analysing: true, error: null }));
+
+    cycleRef.current += 1;
+    const runGemini = cycleRef.current % GEMINI_EVERY_N === 0;
+
+    setLiveData(d => ({ ...d, error: null }));
     const start = Date.now();
-    const [geminiRes, deepfaceRes] = await Promise.allSettled([
-      fetch(`${API_URL}/analyze/gemini`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: frame, room_id: id, session_id: sessionId ?? null }),
-      }).then(r => r.json()),
+
+    const [deepfaceRes, geminiRes] = await Promise.allSettled([
       fetch(`${API_URL}/analyze/deepface`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image_b64: frame, session_id: sessionId ?? 'none', room_id: id }),
       }).then(r => r.json()),
+      runGemini
+        ? fetch(`${API_URL}/analyze/gemini`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: frame, room_id: id, session_id: sessionId ?? null }),
+          }).then(r => r.json())
+        : Promise.resolve(lastGeminiRef.current), // reuse cached result on non-Gemini cycles
     ]);
+
+    // Update Gemini cache when a fresh result arrives
+    if (runGemini && geminiRes.status === 'fulfilled' && geminiRes.value) {
+      lastGeminiRef.current = geminiRes.value;
+    }
+
     applyAnalysis(
-      geminiRes.status === 'fulfilled' ? geminiRes.value : null,
+      geminiRes.status === 'fulfilled' ? geminiRes.value : lastGeminiRef.current,
       deepfaceRes.status === 'fulfilled' ? deepfaceRes.value : null,
       Date.now() - start,
     );
@@ -559,7 +578,7 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
                 src={rtspThumbnail}
                 alt="Latest RTSP frame"
                 className="w-full h-full"
-                style={{ objectFit: 'cover', imageRendering: 'auto' }}
+                style={{ objectFit: 'cover', imageRendering: 'auto', transition: 'opacity 0.25s ease' }}
               />
             ) : (
               <div className="flex flex-col items-center gap-4 text-center p-6">
@@ -569,7 +588,7 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
                 <div>
                   <p className="text-green-400 font-mono text-xs tracking-widest uppercase mb-1">Server-Side RTSP Polling Active</p>
                   <p className="text-gray-600 font-mono text-[10px] break-all max-w-xs">{source.url}</p>
-                  <p className="text-gray-700 text-[10px] mt-2">Waiting for first frame — analysis every 8s</p>
+                  <p className="text-gray-700 text-[10px] mt-2">Waiting for first frame — DeepFace every 4s · Gemini every 12s</p>
                 </div>
               </div>
             )}
@@ -597,7 +616,7 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
           </div>
           <div className="overlay-bar">
             <div className={`w-1.5 h-1.5 shrink-0 rounded-full ${source ? engBg : 'bg-gray-600'}`} />
-            {source ? `Analysis Active · ${source.type === 'webcam' ? WEBCAM_INTERVAL_MS : source.type === 'upload' ? UPLOAD_INTERVAL_MS : 8_000}ms interval` : 'Pipeline idle'}
+            {source ? `Analysis Active · ${source.type === 'webcam' ? `${WEBCAM_INTERVAL_MS}ms` : source.type === 'upload' ? `${UPLOAD_INTERVAL_MS}ms` : '4s'} · Gemini every ${GEMINI_EVERY_N}rd cycle` : 'Pipeline idle'}
             {liveData.latencyMs ? ` · ${liveData.latencyMs}ms` : ''}
           </div>
         </div>

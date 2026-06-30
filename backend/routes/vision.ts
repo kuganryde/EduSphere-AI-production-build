@@ -14,7 +14,7 @@ const limiter = rateLimit({
 });
 
 const cache = new Map<string, { data: any; timestamp: number }>();
-const CACHE_DURATION = 30 * 1000;
+const CACHE_DURATION = 4 * 1000; // short — prevents duplicate concurrent requests only
 
 const ALERT_LEVEL: Record<string, number> = {
   high_distraction: 2,
