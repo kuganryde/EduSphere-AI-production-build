@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { AnalysisUpdate, DetectedFace, DetectedPerson } from '../types';
+import { AnalysisUpdate, DetectedFace, DetectedPerson, Student } from '../types';
 import { getAuthHeader } from '../context/AuthContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
@@ -58,6 +58,7 @@ function drawDetections(
   detection: DetectionState,
   displayW: number,
   displayH: number,
+  studentMatches: Map<number, Student>,
 ) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
@@ -88,14 +89,15 @@ function drawDetections(
   });
 
   // Face corner-brackets
-  detection.faces.forEach(face => {
+  detection.faces.forEach((face, idx) => {
     const { x, y, w, h } = face.box;
     if (w < 10 || h < 10) return;
     const dx = x * sx, dy = y * sy, dw = w * sx, dh = h * sy;
-    const color = EMOTION_COLOR[face.emotion] ?? '#94a3b8';
+    const matched = studentMatches.get(idx);
+    const color = matched ? '#10b981' : (EMOTION_COLOR[face.emotion] ?? '#94a3b8');
     const corner = Math.min(dw, dh) * 0.18;
     ctx.strokeStyle = color + (face.attention ? 'ff' : '88');
-    ctx.lineWidth = 2;
+    ctx.lineWidth = matched ? 2.5 : 2;
     // TL
     ctx.beginPath(); ctx.moveTo(dx, dy + corner); ctx.lineTo(dx, dy); ctx.lineTo(dx + corner, dy); ctx.stroke();
     // TR
@@ -109,16 +111,47 @@ function drawDetections(
     ctx.arc(dx + dw - 6, dy + 6, 4, 0, Math.PI * 2);
     ctx.fillStyle = face.attention ? '#10b981' : '#ef4444';
     ctx.fill();
-    // Emotion label
-    const label = face.emotion;
-    ctx.font = 'bold 11px monospace';
-    const lw = ctx.measureText(label).width + 10;
-    ctx.fillStyle = color + 'cc';
-    ctx.beginPath();
-    ctx.roundRect(dx, dy + dh + 2, lw, 18, 4);
-    ctx.fill();
-    ctx.fillStyle = '#fff';
-    ctx.fillText(label, dx + 5, dy + dh + 14);
+
+    if (matched) {
+      // Student name banner above box
+      const nameText = matched.name;
+      const idText   = matched.student_id;
+      ctx.font = 'bold 12px system-ui, sans-serif';
+      const nameW = ctx.measureText(nameText).width;
+      ctx.font = '10px monospace';
+      const idW = ctx.measureText(idText).width;
+      const bannerW = Math.max(nameW, idW) + 16;
+      const bannerH = 34;
+      const bx = dx;
+      const by = dy - bannerH - 4;
+
+      // Banner background
+      ctx.fillStyle = 'rgba(16,185,129,0.92)';
+      ctx.beginPath();
+      ctx.roundRect(bx, Math.max(0, by), bannerW, bannerH, 5);
+      ctx.fill();
+
+      // Name
+      ctx.font = 'bold 12px system-ui, sans-serif';
+      ctx.fillStyle = '#fff';
+      ctx.fillText(nameText, bx + 8, Math.max(14, by + 14));
+
+      // Student ID
+      ctx.font = '10px monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.80)';
+      ctx.fillText(idText, bx + 8, Math.max(26, by + 27));
+    } else {
+      // Emotion label
+      const label = face.emotion;
+      ctx.font = 'bold 11px monospace';
+      const lw = ctx.measureText(label).width + 10;
+      ctx.fillStyle = color + 'cc';
+      ctx.beginPath();
+      ctx.roundRect(dx, dy + dh + 2, lw, 18, 4);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.fillText(label, dx + 5, dy + dh + 14);
+    }
   });
 }
 
@@ -137,6 +170,7 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
     analysing: false, lastUpdated: null, error: null,
   });
   const [detection, setDetection]   = useState<DetectionState>({ faces: [], persons: [], frameWidth: 0, frameHeight: 0 });
+  const [studentMatches, setStudentMatches] = useState<Map<number, Student>>(new Map());
 
   const videoRef        = useRef<HTMLVideoElement>(null);
   const captureCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -151,6 +185,99 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
   const cycleRef        = useRef<number>(0);            // analysis cycle counter
   const lastGeminiRef   = useRef<any>(null);            // cached Gemini result between staggered calls
   const isAnalysingRef  = useRef(false);
+  const lastFrameRef    = useRef<ImageData | null>(null); // last captured frame for face matching
+  // Pre-processed student face pixel arrays (loaded once, refreshed periodically)
+  const studentFacesRef = useRef<{ student: Student; pixels: Uint8ClampedArray }[]>([]);
+
+  // ── Load registered students and pre-process face images ─────────────────────
+  const loadStudentFaces = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/students`, { headers: getAuthHeader() });
+      if (!res.ok) return;
+      const students: Student[] = await res.json();
+      const processed: { student: Student; pixels: Uint8ClampedArray }[] = [];
+      const SIZE = 32;
+      for (const s of students) {
+        if (!s.face_b64) continue;
+        await new Promise<void>(resolve => {
+          const img = new Image();
+          img.onload = () => {
+            const c = document.createElement('canvas');
+            c.width = SIZE; c.height = SIZE;
+            const ctx = c.getContext('2d')!;
+            ctx.drawImage(img, 0, 0, SIZE, SIZE);
+            processed.push({ student: s, pixels: ctx.getImageData(0, 0, SIZE, SIZE).data });
+            resolve();
+          };
+          img.onerror = () => resolve();
+          img.src = `data:image/jpeg;base64,${s.face_b64}`;
+        });
+      }
+      studentFacesRef.current = processed;
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    loadStudentFaces();
+    const id = setInterval(loadStudentFaces, 30_000); // refresh every 30 s
+    return () => clearInterval(id);
+  }, [loadStudentFaces]);
+
+  // ── Match detected face boxes against registered student faces ────────────────
+  const matchStudentFaces = useCallback((
+    faces: DetectedFace[],
+    frameW: number,
+    frameH: number,
+  ) => {
+    if (studentFacesRef.current.length === 0 || !lastFrameRef.current || !frameW || !frameH) {
+      setStudentMatches(new Map());
+      return;
+    }
+    const SIZE = 32;
+    const THRESHOLD = 52; // mean absolute error per channel (0-255); lower = stricter
+    const frame = lastFrameRef.current;
+    const scaleX = frame.width  / frameW;
+    const scaleY = frame.height / frameH;
+    const matches = new Map<number, Student>();
+
+    const tempC = document.createElement('canvas');
+    tempC.width = SIZE; tempC.height = SIZE;
+    const tempCtx = tempC.getContext('2d')!;
+
+    // Build a canvas from the saved ImageData so we can drawImage crop
+    const srcC = document.createElement('canvas');
+    srcC.width = frame.width; srcC.height = frame.height;
+    srcC.getContext('2d')!.putImageData(frame, 0, 0);
+
+    faces.forEach((face, idx) => {
+      const { x, y, w, h } = face.box;
+      const cx = x * scaleX, cy = y * scaleY, cw = w * scaleX, ch = h * scaleY;
+      if (cw < 4 || ch < 4) return;
+
+      tempCtx.drawImage(srcC, cx, cy, cw, ch, 0, 0, SIZE, SIZE);
+      const crop = tempCtx.getImageData(0, 0, SIZE, SIZE).data;
+
+      let bestStudent: Student | null = null;
+      let bestScore = Infinity;
+
+      for (const { student, pixels } of studentFacesRef.current) {
+        let diff = 0;
+        for (let i = 0; i < crop.length; i += 4) {
+          diff += Math.abs(crop[i]   - pixels[i])
+                + Math.abs(crop[i+1] - pixels[i+1])
+                + Math.abs(crop[i+2] - pixels[i+2]);
+        }
+        const mae = diff / (SIZE * SIZE * 3);
+        if (mae < bestScore) { bestScore = mae; bestStudent = student; }
+      }
+
+      if (bestStudent && bestScore < THRESHOLD) {
+        matches.set(idx, bestStudent);
+      }
+    });
+
+    setStudentMatches(matches);
+  }, []);
 
   // ── External trigger from Dashboard camera strip ──────────────
   useEffect(() => {
@@ -188,8 +315,8 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
     const container = containerRef.current;
     if (!canvas || !container) return;
     const { width, height } = container.getBoundingClientRect();
-    if (width && height) drawDetections(canvas, detection, Math.round(width), Math.round(height));
-  }, [detection]);
+    if (width && height) drawDetections(canvas, detection, Math.round(width), Math.round(height), studentMatches);
+  }, [detection, studentMatches]);
 
   useEffect(() => {
     animFrameRef.current = requestAnimationFrame(redrawOverlay);
@@ -214,6 +341,7 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
 
     if (d && !d.degraded && Array.isArray(d.faces)) {
       setDetection({ faces: d.faces, persons: d.persons ?? [], frameWidth: d.frame_width ?? 0, frameHeight: d.frame_height ?? 0 });
+      matchStudentFaces(d.faces, d.frame_width ?? 0, d.frame_height ?? 0);
     }
 
     onStatsUpdate?.({
@@ -256,7 +384,7 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
         body: JSON.stringify(body),
       }).catch(() => {}); // fire-and-forget
     }
-  }, [onStatsUpdate, sessionId, id]);
+  }, [onStatsUpdate, sessionId, id, matchStudentFaces]);
 
   // ── Webcam ────────────────────────────────────────────────────────────────────
   const startWebcam = useCallback(async () => {
@@ -299,6 +427,7 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    lastFrameRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
     return canvas.toDataURL('image/jpeg', 0.78).split(',')[1];
   }, []);
 
@@ -629,6 +758,41 @@ export default function RoomCard({ name, capacity, roomId, sessionId, onStatsUpd
           </div>
         </div>
       </div>
+
+      {/* Detected students strip */}
+      {studentMatches.size > 0 && (
+        <div
+          className="shrink-0 w-full rounded-xl px-3 py-2 flex flex-wrap gap-2"
+          style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}
+        >
+          <span className="text-[9px] font-bold uppercase tracking-widest self-center" style={{ color: '#10b981', minWidth: 80 }}>
+            Students Detected
+          </span>
+          {Array.from(studentMatches.values()).map(s => (
+            <div
+              key={s.id}
+              className="flex items-center gap-2 px-2 py-1 rounded-lg"
+              style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)' }}
+            >
+              {s.face_b64 ? (
+                <img
+                  src={`data:image/jpeg;base64,${s.face_b64}`}
+                  alt={s.name}
+                  style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover' }}
+                />
+              ) : (
+                <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'rgba(16,185,129,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: '#10b981' }}>
+                  {s.name[0]}
+                </div>
+              )}
+              <div>
+                <p className="text-[11px] font-semibold leading-tight" style={{ color: '#10b981' }}>{s.name}</p>
+                <p className="text-[9px] font-mono leading-tight" style={{ color: 'rgba(16,185,129,0.65)' }}>{s.student_id}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-3 shrink-0 w-full">

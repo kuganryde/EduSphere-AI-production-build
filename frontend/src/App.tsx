@@ -5,13 +5,14 @@ import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { DemoProvider, useDemoMode } from './context/DemoContext';
 import LoginModal from './components/LoginModal';
 
-const Dashboard     = lazy(() => import('./components/Dashboard'));
-const OperatorMode  = lazy(() => import('./components/OperatorMode'));
-const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
-const ReportsPage   = lazy(() => import('./pages/ReportsPage'));
-const AuditLogPage  = lazy(() => import('./pages/AuditLogPage'));
+const Dashboard            = lazy(() => import('./components/Dashboard'));
+const OperatorMode         = lazy(() => import('./components/OperatorMode'));
+const AnalyticsPage        = lazy(() => import('./pages/AnalyticsPage'));
+const ReportsPage          = lazy(() => import('./pages/ReportsPage'));
+const AuditLogPage         = lazy(() => import('./pages/AuditLogPage'));
+const StudentRegistryPage  = lazy(() => import('./pages/StudentRegistryPage'));
 
-type Page = 'dashboard' | 'operator' | 'analytics' | 'reports' | 'audit' | 'syshealth' | 'alerts';
+type Page = 'dashboard' | 'operator' | 'analytics' | 'reports' | 'audit' | 'syshealth' | 'alerts' | 'students';
 
 const Spinner = () => (
   <div className="flex-1 flex items-center justify-center">
@@ -114,6 +115,7 @@ const PAGE_LABEL: Record<Page, string> = {
   audit:     'Audit Log',
   syshealth: 'System Health',
   alerts:    'Alert Center',
+  students:  'Student Registry',
 };
 
 /* ── Sidebar section nav structure ───────────────────────────── */
@@ -523,6 +525,7 @@ function AppShell() {
       items: [
         { id: 'dashboard', label: 'Live Dashboard',   sub: 'Real-time overview',  Icon: IconDashboard },
         { id: 'operator',  label: 'Operator Display', sub: 'Full-screen mode',    perm: 'operator_mode', Icon: IconMonitor },
+        { id: 'students',  label: 'Student Registry', sub: 'Register & identify', Icon: IconUsers },
       ],
     },
     {
@@ -554,6 +557,7 @@ function AppShell() {
   // Map sidebar IDs to actual pages
   const resolveId = (id: string): Page => {
     if (id === 'settings') return 'dashboard';
+    if (id === 'students') return 'students';
     return id as Page;
   };
 
@@ -736,6 +740,7 @@ function AppShell() {
             {page === 'analytics'  && <AnalyticsPage tab={analyticsTab} />}
             {page === 'reports'    && <ReportsPage />}
             {page === 'audit'      && <AuditLogPage />}
+            {page === 'students'   && <StudentRegistryPage />}
           </Suspense>
         </main>
       </div>

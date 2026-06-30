@@ -129,6 +129,20 @@ export type SentimentType = 'focused' | 'distracted' | 'tired' | 'energetic' | '
 export type AlertLevel = 1 | 2 | 3;
 export type ClassState = 'IDLE' | 'ACTIVE' | 'ALERT';
 
+export interface Student {
+  id: string;
+  student_id: string;
+  name: string;
+  face_b64: string | null;
+  created_at: string;
+}
+
+export interface DetectedStudent {
+  student: Student;
+  faceIndex: number;
+  score: number;
+}
+
 export interface EmotionTimelinePoint {
   time: string;
   angry: number;

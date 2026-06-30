@@ -20,6 +20,7 @@ import auditRoutes     from "./routes/audit";
 import reportsRoutes   from "./routes/reports";
 import diagnosticRoutes from "./routes/diagnostic";
 import authRoutes      from "./routes/auth";
+import studentsRoutes  from "./routes/students";
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -91,6 +92,7 @@ app.use("/api/alerts",           alertsRoutes);
 app.use("/api/audit",            auditRoutes);
 app.use("/api/reports",          reportsRoutes);
 app.use("/api/diagnostic",       diagnosticRoutes);
+app.use("/api/students",         studentsRoutes);
 
 // ── 404 ───────────────────────────────────────────────────────────────────────────
 app.use((req, res) => {
